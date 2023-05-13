@@ -14,6 +14,7 @@ import { initializeDebugger, load_variables, returnLinesWithoutBreakpoints, stop
 import { localDelete, localLoad, localSave } from './local';
 import { initializeLoginLinks } from './auth';
 import { postJson } from './comm';
+import { L1StepRes, L2StepRes } from './ampersand';
 
 // const MOVE_CURSOR_TO_BEGIN = -1;
 const MOVE_CURSOR_TO_END = 1;
@@ -44,7 +45,7 @@ let currentTab: string;
 let theUserIsLoggedIn: boolean;
 
 const pygame_suffix =
-`# coding=utf8
+  `# coding=utf8
 pygame_end = True
 pygame.quit()
 `;
@@ -128,22 +129,22 @@ export function initializeApp(options: InitializeAppOptions) {
   initializeCopyToClipboard();
 
   // Close the dropdown menu if the user clicks outside of it
-  $(document).on("click", function(event){
-      if(!$(event.target).closest(".dropdown").length){
-          $(".dropdown-menu").slideUp("medium");
-          $(".cheatsheet-menu").slideUp("medium");
-      }
+  $(document).on("click", function (event) {
+    if (!$(event.target).closest(".dropdown").length) {
+      $(".dropdown-menu").slideUp("medium");
+      $(".cheatsheet-menu").slideUp("medium");
+    }
   });
 
-  $("#search_language").on('keyup', function() {
-      let search_query = ($("#search_language").val() as string).toLowerCase();
-      $(".language").each(function(){
-          if ($(this).html().toLowerCase().includes(search_query)) {
-              $(this).show();
-          } else {
-              $(this).hide();
-          }
-      });
+  $("#search_language").on('keyup', function () {
+    let search_query = ($("#search_language").val() as string).toLowerCase();
+    $(".language").each(function () {
+      if ($(this).html().toLowerCase().includes(search_query)) {
+        $(this).show();
+      } else {
+        $(this).hide();
+      }
+    });
   });
 
   // All input elements with data-autosubmit="true" automatically submit their enclosing form
@@ -277,12 +278,12 @@ function initializeMainEditor($editor: JQuery) {
     }
 
     // When the user exits the editor, save what we have.
-    editor.on('blur', function(_e: Event) {
+    editor.on('blur', function (_e: Event) {
       storage.setItem(currentTabLsKey(), editor.getValue());
     });
 
     if (dir === "rtl") {
-        editor.setOptions({ rtl: true });
+      editor.setOptions({ rtl: true });
     }
 
     // If prompt is shown and user enters text in the editor, hide the prompt.
@@ -293,7 +294,7 @@ function initializeMainEditor($editor: JQuery) {
       }
       if ($('#ask-modal').is(':visible')) $('#inline-modal').hide();
       askPromptOpen = false;
-      $ ('#runit').css('background-color', '');
+      $('#runit').css('background-color', '');
 
       clearErrors(editor);
       //removing the debugging state when loading in the editor
@@ -306,7 +307,7 @@ function initializeMainEditor($editor: JQuery) {
   let altPressed: boolean | undefined;
 
   // alt is 18, enter is 13
-  window.addEventListener ('keydown', function (ev) {
+  window.addEventListener('keydown', function (ev) {
     const keyCode = ev.keyCode;
     if (keyCode === 18) {
       altPressed = true;
@@ -316,17 +317,17 @@ function initializeMainEditor($editor: JQuery) {
       if (!theLevel || !theLanguage) {
         throw new Error('Oh no');
       }
-      runit (theLevel, theLanguage, "", function () {
-        $ ('#output').focus ();
+      runit_different(theLevel, theLanguage, "", function () {
+        $('#output').focus();
       });
     }
     // We don't use jquery because it doesn't return true for this equality check.
-    if (keyCode === 37 && document.activeElement === document.getElementById ('output')) {
-      editor.focus ();
-      editor.navigateFileEnd ();
+    if (keyCode === 37 && document.activeElement === document.getElementById('output')) {
+      editor.focus();
+      editor.navigateFileEnd();
     }
   });
-  window.addEventListener ('keyup', function (ev) {
+  window.addEventListener('keyup', function (ev) {
     triggerAutomaticSave();
     const keyCode = ev.keyCode;
     if (keyCode === 18) {
@@ -386,7 +387,7 @@ export function initializeHighlightedCodeBlocks(where: Element) {
         }
 
         if (dir === "rtl") {
-            exampleEditor.setOptions({ rtl: true });
+          exampleEditor.setOptions({ rtl: true });
         }
 
         // Strip trailing newline, it renders better
@@ -394,12 +395,12 @@ export function initializeHighlightedCodeBlocks(where: Element) {
         // And add an overlay button to the editor if requested via a show-copy-button class, either
         // on the <pre> itself OR on the element that has the '.turn-pre-into-ace' class.
         if ($(preview).hasClass('show-copy-button') || $(container).hasClass('show-copy-button')) {
-          const buttonContainer = $('<div>').addClass('absolute ltr:-right-1 rtl:left-2 w-16').css({top: 5}).appendTo(preview);
+          const buttonContainer = $('<div>').addClass('absolute ltr:-right-1 rtl:left-2 w-16').css({ top: 5 }).appendTo(preview);
           let symbol = "⇥";
           if (dir === "rtl") {
             symbol = "⇤";
           }
-          $('<button>').css({ fontFamily: 'sans-serif' }).addClass('yellow-btn').text(symbol).appendTo(buttonContainer).click(function() {
+          $('<button>').css({ fontFamily: 'sans-serif' }).addClass('yellow-btn').text(symbol).appendTo(buttonContainer).click(function () {
             if (!theGlobalEditor?.getReadOnly()) {
               theGlobalEditor?.setValue(exampleEditor.getValue() + '\n', MOVE_CURSOR_TO_END);
             }
@@ -429,32 +430,61 @@ function clearErrors(editor: AceAjax.Editor) {
   markers.clearErrors();
 }
 
+export function stopit_ampersand() {
+  if (pygameRunning) {
+    // when running pygame, raise the pygame quit event
+    //Sk.insertPyGameEvent("quit");
+    //Sk.unbindPygameListeners();
+
+    //pygameRunning = false;
+    document.onkeydown = null;
+    //$('#pygame-modal').hide();
+    $('#stopit').hide();
+    $('#runit').show();
+  }
+  else {
+    // We bucket-fix stop the current program by setting the run limit to 1ms
+    //Sk.execLimit = 1;
+    //clearTimeouts();
+    $('#stopit').hide();
+    $('#runit').show();
+
+    // This gets a bit complex: if we do have some input modal waiting, fake submit it and hide it
+    // This way the Promise is no longer "waiting" and can no longer mess with our next program
+    if ($('#ask-modal').is(":visible")) {
+      $('#ask-modal form').submit();
+      $('#ask-modal').hide();
+    }
+  }
+
+  askPromptOpen = false;
+}
+
 export function stopit() {
   if (pygameRunning) {
-      // when running pygame, raise the pygame quit event
-      Sk.insertPyGameEvent("quit");
-      Sk.unbindPygameListeners();
+    // when running pygame, raise the pygame quit event
+    Sk.insertPyGameEvent("quit");
+    Sk.unbindPygameListeners();
 
-      pygameRunning = false;
-      document.onkeydown = null;
-      $('#pygame-modal').hide();
-      $('#stopit').hide();
-      $('#runit').show();
+    pygameRunning = false;
+    document.onkeydown = null;
+    $('#pygame-modal').hide();
+    $('#stopit').hide();
+    $('#runit').show();
   }
-  else
-  {
-      // We bucket-fix stop the current program by setting the run limit to 1ms
-      Sk.execLimit = 1;
-      clearTimeouts();
-      $('#stopit').hide();
-      $('#runit').show();
+  else {
+    // We bucket-fix stop the current program by setting the run limit to 1ms
+    Sk.execLimit = 1;
+    clearTimeouts();
+    $('#stopit').hide();
+    $('#runit').show();
 
-      // This gets a bit complex: if we do have some input modal waiting, fake submit it and hide it
-      // This way the Promise is no longer "waiting" and can no longer mess with our next program
-      if ($('#ask-modal').is(":visible")) {
-        $('#ask-modal form').submit();
-        $('#ask-modal').hide();
-      }
+    // This gets a bit complex: if we do have some input modal waiting, fake submit it and hide it
+    // This way the Promise is no longer "waiting" and can no longer mess with our next program
+    if ($('#ask-modal').is(":visible")) {
+      $('#ask-modal form').submit();
+      $('#ask-modal').hide();
+    }
   }
 
   askPromptOpen = false;
@@ -477,6 +507,130 @@ function clearOutput() {
   const buttonsDiv = $('#dynamic-buttons');
   buttonsDiv.empty();
   buttonsDiv.hide();
+}
+
+export async function runit_ampersand(level: number, lang: string, disabled_prompt: string, cb: () => void) {
+  // Copy 'currentTab' into a variable, so that our event handlers don't mess up
+  // if the user changes tabs while we're waiting for a response
+  const adventureName = currentTab;
+
+  if (askPromptOpen) {
+    // If there is no message -> don't show a prompt
+    if (disabled_prompt) {
+      return modal.notifyError(disabled_prompt);
+    }
+    return;
+  }
+
+  // TODO
+  // Make sure to stop previous PyGame event listeners
+  /*if (typeof Sk.unbindPygameListeners === 'function') {
+    Sk.unbindPygameListeners();
+  }*/
+
+  // We set the run limit to 1ms -> make sure that the previous programs stops (if there is any)
+  //Sk.execLimit = 1;
+  $('#runit').hide();
+  $('#stopit').show();
+  $('#saveFiles').hide();
+  clearOutput();
+
+  try {
+    var editor = theGlobalEditor;
+    var code = "";
+    if ($('#parsons_container').is(":visible")) {
+      code = get_parsons_code();
+      // We return no code if all lines are empty or there is a mistake -> clear errors and do nothing
+      if (!code) {
+        clearErrors(editor);
+        stopit_ampersand();
+        return;
+      } else {
+        // Add the onclick on the button -> only show if there is another exercise to load (set with an onclick)
+        if ($('#next_parson_button').attr('onclick')) {
+          $('#next_parson_button').show();
+        }
+      }
+    } else {
+      code = get_active_and_trimmed_code();
+      if (code.length == 0) {
+        clearErrors(editor);
+        stopit_ampersand();
+        return;
+      }
+    }
+
+    clearErrors(editor);
+    removeBulb();
+    console.log('Original program:\n', code);
+
+    const adventure = theAdventures[adventureName];
+
+    try {
+      cancelPendingAutomaticSave();
+      const response = await postJsonWithAchievements('/parse_ampersand', {
+        level: `${level}`,
+        code: code,
+        lang: lang,
+        tutorial: $('#code_output').hasClass("z-40"), // if so -> tutorial mode
+        read_aloud: !!$('#speak_dropdown').val(),
+        adventure_name: adventureName,
+
+        // Save under an existing id if this field is set
+        program_id: isServerSaveInfo(adventure?.save_info) ? adventure.save_info.id : undefined,
+        save_name: saveNameFromInput(),
+      });
+
+      console.log('Response', response);
+
+      if (response.Warning && $('#editor').is(":visible")) {
+        //storeFixedCode(response, level);
+        error.showWarning(ClientMessages['Transpile_warning'], response.Warning);
+      }
+      showAchievements(response.achievements, false, "");
+      if (adventure && response.save_info) {
+        adventure.save_info = response.save_info;
+        adventure.start_code = code;
+      }
+      if (response.Error) {
+        error.show(ClientMessages['Transpile_error'], response.Error);
+        if (response.Location && response.Location[0] != "?") {
+          //storeFixedCode(response, level);
+          // Location can be either [row, col] or just [row].
+          markers.highlightAceError(response.Location[0], response.Location[1]);
+        }
+        $('#stopit').hide();
+        $('#runit').show();
+        return;
+      }
+      await runAmpersandProgram(response.Code, response.has_turtle, response.has_pygame, response.has_sleep, response.Warning, cb)
+      /*.catch(function (err) {
+        // The err is null if we don't understand it -> don't show anything
+        if (err != null) {
+          error.show(ClientMessages['Execute_error'], err.message);
+          reportClientError(level, code, err.message);
+        }
+      });*/
+    } catch (e: any) {
+      console.error(e);
+      if (e.internetError) {
+        error.show(ClientMessages['Connection_error'], ClientMessages['CheckInternet']);
+      } else {
+        error.show(ClientMessages['Other_error'], ClientMessages['ServerError']);
+      }
+    }
+  } catch (e: any) {
+    modal.notifyError(e.responseText);
+  }
+}
+
+export async function runit_different(level: number, lang: string, disabled_prompt: string, cb: () => void) {
+  if (level < 2) {
+    return runit_ampersand(level, lang, disabled_prompt, cb)
+  }
+  else {
+    return runit(level, lang, disabled_prompt, cb)
+  }
 }
 
 export async function runit(level: number, lang: string, disabled_prompt: string, cb: () => void) {
@@ -542,7 +696,7 @@ export async function runit(level: number, lang: string, disabled_prompt: string
         code: code,
         lang: lang,
         tutorial: $('#code_output').hasClass("z-40"), // if so -> tutorial mode
-        read_aloud : !!$('#speak_dropdown').val(),
+        read_aloud: !!$('#speak_dropdown').val(),
         adventure_name: adventureName,
 
         // Save under an existing id if this field is set
@@ -572,7 +726,7 @@ export async function runit(level: number, lang: string, disabled_prompt: string
         $('#runit').show();
         return;
       }
-      runPythonProgram(response.Code, response.has_turtle, response.has_pygame, response.has_sleep, response.Warning, cb).catch(function(err) {
+      runPythonProgram(response.Code, response.has_turtle, response.has_pygame, response.has_sleep, response.Warning, cb).catch(function (err) {
         // The err is null if we don't understand it -> don't show anything
         if (err != null) {
           error.show(ClientMessages['Execute_error'], err.message);
@@ -611,8 +765,8 @@ const ACHIEVEMENTS_PUSHED: Record<string, boolean> = {};
 
 export async function pushAchievement(achievement: string) {
   if (ACHIEVEMENTS_PUSHED[achievement]) {
-      console.warn('Achievement already pushed, this may be a programming issue: ', achievement);
-      return;
+    console.warn('Achievement already pushed, this may be a programming issue: ', achievement);
+    return;
   }
   ACHIEVEMENTS_PUSHED[achievement] = true;
 
@@ -653,42 +807,43 @@ export async function showAchievements(achievements: Achievement[] | undefined, 
 
   if (reload) {
     $('#achievement_pop-up').attr('reload', 'true');
-    setTimeout(function(){
+    setTimeout(function () {
       $('#achievement_pop-up').removeAttr('reload');
       $('#achievement_pop-up').removeAttr('redirect');
       location.reload();
-     }, achievements.length * 6000);
+    }, achievements.length * 6000);
   }
   if (redirect) {
     $('#achievement_pop-up').attr('redirect', redirect);
-    setTimeout(function(){
+    setTimeout(function () {
       $('#achievement_pop-up').removeAttr('reload');
       $('#achievement_pop-up').removeAttr('redirect');
       window.location.pathname = redirect;
-     }, achievements.length * 6000);
+    }, achievements.length * 6000);
   }
 }
 
 function showAchievement(achievement: Achievement) {
-  return new Promise<void>((resolve)=>{
-        $('#achievement_reached_title').text('"' + achievement[0] + '"');
-        $('#achievement_reached_text').text(achievement[1]);
-        $('#achievement_reached_statics').text(achievement[2]);
-        $('#achievement_pop-up').fadeIn(1000, function () {
-          setTimeout(function(){
-            $('#achievement_pop-up').fadeOut(1000);
-           }, 4000);
-        });
-        setTimeout(()=>{
-            resolve();
-        ;} , 6000
-        );
+  return new Promise<void>((resolve) => {
+    $('#achievement_reached_title').text('"' + achievement[0] + '"');
+    $('#achievement_reached_text').text(achievement[1]);
+    $('#achievement_reached_statics').text(achievement[2]);
+    $('#achievement_pop-up').fadeIn(1000, function () {
+      setTimeout(function () {
+        $('#achievement_pop-up').fadeOut(1000);
+      }, 4000);
     });
+    setTimeout(() => {
+      resolve();
+      ;
+    }, 6000
+    );
+  });
 }
 
-function removeBulb(){
-    const repair_button = $('#repair_button');
-    repair_button.hide();
+function removeBulb() {
+  const repair_button = $('#repair_button');
+  repair_button.hide();
 }
 
 /**
@@ -702,8 +857,8 @@ export function tryPaletteCode(exampleCode: string) {
   theGlobalEditor.setValue(exampleCode + '\n', MOVE_CURSOR_TO_END);
   //As the commands try-it buttons only contain english code -> make sure the selected language is english
   if (!($('#editor').attr('lang') == 'en')) {
-      $('#editor').attr('lang', 'en');
-      update_view("main_editor_keyword_selector", "en");
+    $('#editor').attr('lang', 'en');
+    update_view("main_editor_keyword_selector", "en");
   }
 }
 
@@ -722,11 +877,11 @@ export async function delete_program(id: string, index: number, prompt: string) 
 }
 
 function set_favourite(index: number) {
-    $('.favourite_program_container').removeClass('text-yellow-400');
-    $('.favourite_program_container').addClass('text-white');
+  $('.favourite_program_container').removeClass('text-yellow-400');
+  $('.favourite_program_container').addClass('text-white');
 
-    $('#favourite_program_container_' + index).removeClass('text-white');
-    $('#favourite_program_container_' + index).addClass('text-yellow-400');
+  $('#favourite_program_container_' + index).removeClass('text-white');
+  $('#favourite_program_container_' + index).addClass('text-yellow-400');
 }
 
 export async function set_favourite_program(id: string, index: number, prompt: string) {
@@ -738,17 +893,17 @@ export async function set_favourite_program(id: string, index: number, prompt: s
   });
 }
 
-function change_to_submitted (index: number) {
-    // Index is a front-end unique given to each program container and children
-    // This value enables us to remove, hide or show specific element without connecting to the server (again)
-    $('#non_submitted_button_container_' + index).remove();
-    $('#submitted_button_container_' + index).show();
-    $('#submitted_header_' + index).show();
-    $('#program_' + index).removeClass("border-orange-400");
-    $('#program_' + index).addClass("border-gray-400 bg-gray-400");
+function change_to_submitted(index: number) {
+  // Index is a front-end unique given to each program container and children
+  // This value enables us to remove, hide or show specific element without connecting to the server (again)
+  $('#non_submitted_button_container_' + index).remove();
+  $('#submitted_button_container_' + index).show();
+  $('#submitted_header_' + index).show();
+  $('#program_' + index).removeClass("border-orange-400");
+  $('#program_' + index).addClass("border-gray-400 bg-gray-400");
 }
 
-export function submit_program (id: string, index: number) {
+export function submit_program(id: string, index: number) {
   tryCatchPopup(async () => {
     await postJsonWithAchievements('/programs/submit', { id });
     change_to_submitted(index);
@@ -782,24 +937,24 @@ export function report_program(prompt: string, id: string) {
   });
 }
 
-export function copy_to_clipboard (string: string, prompt: string) {
+export function copy_to_clipboard(string: string, prompt: string) {
   // https://hackernoon.com/copying-text-to-clipboard-with-javascript-df4d4988697f
-  var el = document.createElement ('textarea');
+  var el = document.createElement('textarea');
   el.value = string;
-  el.setAttribute ('readonly', '');
+  el.setAttribute('readonly', '');
   el.style.position = 'absolute';
   el.style.left = '-9999px';
-  document.body.appendChild (el);
+  document.body.appendChild(el);
 
   const selection = document.getSelection();
   const originalSelection = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : undefined;
 
-  el.select ();
-  document.execCommand ('copy');
-  document.body.removeChild (el);
+  el.select();
+  document.execCommand('copy');
+  document.body.removeChild(el);
   if (originalSelection) {
-     document.getSelection()?.removeAllRanges ();
-     document.getSelection()?.addRange (originalSelection);
+    document.getSelection()?.removeAllRanges();
+    document.getSelection()?.addRange(originalSelection);
   }
 
   // Hide all modals to make sure the copy clipboard modal is hidden as well -> show alert() with feedback
@@ -831,6 +986,160 @@ window.onerror = function reportClientException(message, source, line_number, co
   });
 }
 
+function setAmpersandWorker(): Promise<Worker> {
+  return new Promise(function (ok) {
+    let timeoutHandler = undefined;
+
+    let ampersand_worker = new Worker("vendor/ampersand_worker.js");
+    ampersand_worker.onmessage = (e: { data: L1StepRes | { type: "worker_is_ready" } }) => {
+      //console.log("Message received from worker");
+      let complete_last_result = e.data;
+      console.log(complete_last_result);
+
+      if (complete_last_result.type === "worker_is_ready") {
+        ok(ampersand_worker)
+      }
+      else if (complete_last_result.type === "normal") {
+        let last_result = complete_last_result.data;
+        console.log(last_result);
+        
+        if (last_result.type === "done") {
+          //fix_buttons(true, false);
+        } else if (last_result.type === "loaded") {
+          //fix_buttons(true, false);
+        } else if (last_result.type === "nothing_to_do") {
+          //fix_buttons(true, false);
+        } else if (last_result.type === "runtime_error") {
+          //has_error = true;
+          //fix_buttons(true, false);
+          //runtime_error_field.innerHTML = JSON.stringify(last_result.error);
+        }
+        else if (last_result.type === "sys_call") {
+          let sys_call = last_result.sys_call;
+          if (sys_call.type === "writing_output") {
+            outf(sys_call.text);
+            ampersand_worker.postMessage({
+              type: "continue",
+            });
+          } else if (sys_call.type === "writing_input_question") {
+            /*fix_buttons(false, false);
+            input_text.innerText = sys_call.question || "";
+            */
+            ampersand_worker.postMessage({
+              type: "continue",
+            });
+          } else if (sys_call.type === "waiting_for_input") {
+            /*fix_buttons(false, false);
+            input_container.style.display = "block";
+            input.focus();
+          }*/
+           /*else if (sys_call.type === "sleep") {
+            /*fix_buttons(false, false);/
+            timeoutHandler = setTimeout(function () {
+              ampersand_worker.postMessage({
+                type: "continue",
+              });
+            }, sys_call.seconds * 1000)*/
+          } else if (sys_call.type === "turtle_forward") {
+            /*fix_buttons(false, false);
+
+            let forward = sys_call.amount;
+            ctx.beginPath();
+            ctx.moveTo(draw_location[0], draw_location[1]);
+            draw_location = [draw_location[0] + forward * Math.cos(angle), draw_location[1] + forward * Math.sin(angle)]
+            ctx.lineWidth = "2";
+            ctx.strokeStyle = stroke_color;
+            ctx.lineTo(draw_location[0], draw_location[1]);
+            ctx.stroke();
+
+            show_canvas()*/
+            ampersand_worker.postMessage({
+              type: "continue",
+            });
+          } //else if (sys_call.type === "turtle_turn_degrees") {
+            /*fix_buttons(false, false);
+
+            let radians = sys_call.degrees * (Math.PI / 180)
+            angle = (angle + radians);
+
+            show_canvas()*/
+            //ampersand_worker.postMessage({
+            //  type: "continue",
+            //});
+          //}
+           else if (sys_call.type === "turtle_turn") {
+            /*fix_buttons(false, false);
+
+            let turn = sys_call.direction;
+            if (turn == "right") {
+              angle = (angle + Math.PI / 2)
+            } else if (turn == "left") {
+              angle = (angle - Math.PI / 2)
+            }
+
+            show_canvas() /
+            ampersand_worker.postMessage({
+              type: "continue",
+            }); */
+          } else if (sys_call.type === "turtle_color") {
+            /*fix_buttons(false, false);
+
+            let color = sys_call.color;
+            if (color) {
+              // TODO: better
+              if (color == "blue") {
+                stroke_color = "#0000FF";
+              } else if (color == "black") {
+                stroke_color = "#000000";
+              } else if (color == "red") {
+                stroke_color = "#FF0000";
+              }
+            }
+
+            show_canvas()*/
+            ampersand_worker.postMessage({
+              type: "continue",
+            });
+          }
+        }
+      }
+      else if (complete_last_result.type === "step") {
+        //fix_buttons(false, true);
+        //step_by_step_output_area.value += JSON.stringify(complete_last_result.data) + "\n";
+      }
+
+    };
+  });
+}
+
+export async function runAmpersandProgram(this: any, ast: String, hasTurtle: boolean, hasPygame: boolean, hasSleep: boolean, hasWarnings: boolean, cb: () => void) {
+  let outputDiv = $('#output');
+
+  $('#stopit').show();
+  $('#runit').hide();
+  outputDiv.empty();
+
+  let ampersand_worker = await setAmpersandWorker();
+
+  ampersand_worker.postMessage({
+    type: "run_ast",
+    ast
+  });
+
+}
+
+function addToOutput(text: string, color: string) {
+  $('<span>').text(text).css({ color }).appendTo($('#output'));
+  scrollOutputToBottom();
+}
+
+// output functions are configurable.  This one just appends some text
+// to a pre element.
+function outf(text: string) {
+  addToOutput(text, 'white');
+  speak(text)
+}
+
 export function runPythonProgram(this: any, code: string, hasTurtle: boolean, hasPygame: boolean, hasSleep: boolean, hasWarnings: boolean, cb: () => void) {
   // If we are in the Parsons problem -> use a different output
   let outputDiv = $('#output');
@@ -843,10 +1152,10 @@ export function runPythonProgram(this: any, code: string, hasTurtle: boolean, ha
   outputDiv.append(variables);
 
   const storage = window.localStorage;
-  let skulptExternalLibraries:{[index: string]:any} = {
-      './extensions.js': {
-        path: "/vendor/skulpt-stdlib-extensions.js",
-      },
+  let skulptExternalLibraries: { [index: string]: any } = {
+    './extensions.js': {
+      path: "/vendor/skulpt-stdlib-extensions.js",
+    },
   };
   let debug = storage.getItem("debugLine");
 
@@ -855,15 +1164,15 @@ export function runPythonProgram(this: any, code: string, hasTurtle: boolean, ha
   turtleConfig.target = 'turtlecanvas';
   // If the adventures are not shown  -> increase height of turtleConfig
   if ($('#adventures-tab').is(":hidden")) {
-      turtleConfig.height = 600;
-      turtleConfig.worldHeight = 600;
-  } else if ($('#turtlecanvas').attr("raw") == 'yes'){
-      turtleConfig.height = 150;
-      turtleConfig.worldHeight = 250;
+    turtleConfig.height = 600;
+    turtleConfig.worldHeight = 600;
+  } else if ($('#turtlecanvas').attr("raw") == 'yes') {
+    turtleConfig.height = 150;
+    turtleConfig.worldHeight = 250;
   }
   else {
-      turtleConfig.height = 300;
-      turtleConfig.worldHeight = 300;
+    turtleConfig.height = 300;
+    turtleConfig.worldHeight = 300;
   }
   // Always set the width to output panel width -> match the UI
   turtleConfig.width = outputDiv.width();
@@ -882,7 +1191,7 @@ export function runPythonProgram(this: any, code: string, hasTurtle: boolean, ha
     $('#turtlecanvas').show();
   }
 
-  if (hasPygame){
+  if (hasPygame) {
     skulptExternalLibraries = {
       './extensions.js': {
         path: "/vendor/skulpt-stdlib-extensions.js",
@@ -924,7 +1233,7 @@ export function runPythonProgram(this: any, code: string, hasTurtle: boolean, ha
         path: "/vendor/pygame_4_skulpt/version.js",
       },
       './buttons.js': {
-          path: "/js/buttons.js",
+        path: "/js/buttons.js",
       },
     };
 
@@ -972,7 +1281,7 @@ export function runPythonProgram(this: any, code: string, hasTurtle: boolean, ha
       $('#runit').show();
       if (Sk.execLimit != 1) {
         pushAchievement("hedy_hacking");
-        return ClientMessages ['Program_too_long'];
+        return ClientMessages['Program_too_long'];
       } else {
         return null;
       }
@@ -992,16 +1301,16 @@ export function runPythonProgram(this: any, code: string, hasTurtle: boolean, ha
       }
       // Set a time-out of either 20 seconds when having a sleep and 5 seconds when not
       return ((hasSleep) ? 20000 : 5000);
-    }) ()
+    })()
   });
 
   return Sk.misceval.asyncToPromise(() =>
     Sk.importMainWithBody("<stdin>", false, code, true), {
-      "*": () => {
-        // We don't do anything here...
-      }
+    "*": () => {
+      // We don't do anything here...
     }
-   ).then(function(_mod) {
+  }
+  ).then(function (_mod) {
     console.log('Program executed');
     const pythonVariables = Sk.globals;
     load_variables(pythonVariables);
@@ -1019,18 +1328,18 @@ export function runPythonProgram(this: any, code: string, hasTurtle: boolean, ha
 
     // Check if the program was correct but the output window is empty: Return a warning
     if ($('#output').is(':empty') && $('#turtlecanvas').is(':empty')) {
-      if(!debug){
+      if (!debug) {
         pushAchievement("error_or_empty");
         error.showWarning(ClientMessages['Transpile_warning'], ClientMessages['Empty_output']);
       }
       return;
     }
     if (!hasWarnings && code !== last_code && !debug) {
-        showSuccesMessage();
-        last_code = code;
+      showSuccesMessage();
+      last_code = code;
     }
-    if (cb) cb ();
-  }).catch(function(err) {
+    if (cb) cb();
+  }).catch(function (err) {
 
 
     const errorMessage = errorMessageFromSkulptError(err) || null;
@@ -1054,25 +1363,13 @@ export function runPythonProgram(this: any, code: string, hasTurtle: boolean, ha
     return message;
   }
 
-  function addToOutput(text: string, color: string) {
-    $('<span>').text(text).css({ color }).appendTo(outputDiv);
-    scrollOutputToBottom();
-  }
-
-  // output functions are configurable.  This one just appends some text
-  // to a pre element.
-  function outf(text: string) {
-    addToOutput(text, 'white');
-    speak(text)
-  }
-
   function builtinRead(x: string) {
     if (x in skulptExternalLibraries) {
       const tmpPath = skulptExternalLibraries[x]["path"];
       if (x === "./pygame.js") {
         return Sk.misceval.promiseToSuspension(
           fetch(tmpPath)
-              .then(r => r.text()))
+            .then(r => r.text()))
 
       } else {
         let request = new XMLHttpRequest();
@@ -1088,7 +1385,7 @@ export function runPythonProgram(this: any, code: string, hasTurtle: boolean, ha
     }
 
     if (Sk.builtinFiles === undefined || Sk.builtinFiles["files"][x] === undefined)
-        throw "File not found: '" + x + "'";
+      throw "File not found: '" + x + "'";
     return Sk.builtinFiles["files"][x];
   }
 
@@ -1098,57 +1395,57 @@ export function runPythonProgram(this: any, code: string, hasTurtle: boolean, ha
     var storage = window.localStorage;
     var debug = storage.getItem("debugLine")
     if (storage.getItem("prompt-" + prompt) == null) {
-    Sk.execStart = new Date(new Date().getTime() + 1000 * 60 * 60 * 24 * 365);
-    $('#turtlecanvas').hide();
+      Sk.execStart = new Date(new Date().getTime() + 1000 * 60 * 60 * 24 * 365);
+      $('#turtlecanvas').hide();
 
-    if (pygameRunning) {
-      Sk.unbindPygameListeners();
-      document.onkeydown = null;
-      $('#pygame-modal').hide();
-    }
+      if (pygameRunning) {
+        Sk.unbindPygameListeners();
+        document.onkeydown = null;
+        $('#pygame-modal').hide();
+      }
 
-    return new Promise(function(ok) {
-      askPromptOpen = true;
+      return new Promise(function (ok) {
+        askPromptOpen = true;
 
-      const input = $('#ask-modal input[type="text"]');
-      $('#ask-modal .caption').text(prompt);
-      input.val('');
-      input.attr('placeholder', prompt);
-      speak(prompt)
+        const input = $('#ask-modal input[type="text"]');
+        $('#ask-modal .caption').text(prompt);
+        input.val('');
+        input.attr('placeholder', prompt);
+        speak(prompt)
 
-      setTimeout(function() {
-        input.focus();
-      }, 0);
-      $('#ask-modal form').one('submit', function(event) {
-        askPromptOpen = false;
-        event.preventDefault();
-        $('#ask-modal').hide();
-
-        if (hasTurtle) {
-          $('#turtlecanvas').show();
-        }
-
-        if (pygameRunning) {
-          Sk.bindPygameListeners();
-          document.onkeydown = animateKeys;
-
-          if (!hasTurtle) {
-            $('#pygame-modal').show();
-          }
-        }
-
-        // We reset the timer to the present moment.
-        Sk.execStart = new Date ();
-        // We set a timeout for sending back the input, so that the input box is hidden before processing the program.
-        // Since processing the program might take some time, this timeout increases the responsiveness of the UI after
-        // replying to a query.
-        setTimeout (function () {
-           ok(input.val());
-           if (debug != null) {
-              storage.setItem("prompt-" + prompt, input.val()!.toString());
-           }
-           $ ('#output').focus ();
+        setTimeout(function () {
+          input.focus();
         }, 0);
+        $('#ask-modal form').one('submit', function (event) {
+          askPromptOpen = false;
+          event.preventDefault();
+          $('#ask-modal').hide();
+
+          if (hasTurtle) {
+            $('#turtlecanvas').show();
+          }
+
+          if (pygameRunning) {
+            Sk.bindPygameListeners();
+            document.onkeydown = animateKeys;
+
+            if (!hasTurtle) {
+              $('#pygame-modal').show();
+            }
+          }
+
+          // We reset the timer to the present moment.
+          Sk.execStart = new Date();
+          // We set a timeout for sending back the input, so that the input box is hidden before processing the program.
+          // Since processing the program might take some time, this timeout increases the responsiveness of the UI after
+          // replying to a query.
+          setTimeout(function () {
+            ok(input.val());
+            if (debug != null) {
+              storage.setItem("prompt-" + prompt, input.val()!.toString());
+            }
+            $('#output').focus();
+          }, 0);
 
           return false;
         });
@@ -1166,97 +1463,97 @@ export function runPythonProgram(this: any, code: string, hasTurtle: boolean, ha
 }
 
 function resetTurtleTarget() {
-    if (Sk.TurtleGraphics !== undefined) {
+  if (Sk.TurtleGraphics !== undefined) {
 
-      let selector = Sk.TurtleGraphics.target;
-      let target = typeof selector === "string" ? document.getElementById(selector) : selector;
-      if (target !== null && target !== undefined){
-        // clear canvas container
-        while (target.firstChild) {
-          target.removeChild(target.firstChild);
-        }
-        return target;
+    let selector = Sk.TurtleGraphics.target;
+    let target = typeof selector === "string" ? document.getElementById(selector) : selector;
+    if (target !== null && target !== undefined) {
+      // clear canvas container
+      while (target.firstChild) {
+        target.removeChild(target.firstChild);
       }
-
+      return target;
     }
 
-    return null;
+  }
+
+  return null;
 }
 
 function animateKeys(event: KeyboardEvent) {
-    const keyColors = ['#cbd5e0', '#bee3f8', '#4299e1', '#ff617b', '#ae81ea', '#68d391'];
-    const output = $("#output");
+  const keyColors = ['#cbd5e0', '#bee3f8', '#4299e1', '#ff617b', '#ae81ea', '#68d391'];
+  const output = $("#output");
 
-    if (output !== null) {
-      let keyElement = $("<div></div>");
-      output.append(keyElement);
+  if (output !== null) {
+    let keyElement = $("<div></div>");
+    output.append(keyElement);
 
-      keyElement.text(event.key);
-      keyElement.css('color', keyColors[Math.floor(Math.random() * keyColors.length)]);
-      keyElement.addClass('animate-keys')
+    keyElement.text(event.key);
+    keyElement.css('color', keyColors[Math.floor(Math.random() * keyColors.length)]);
+    keyElement.addClass('animate-keys')
 
-      setTimeout(function () {
-        keyElement.remove()
-      }, 1500);
-    }
+    setTimeout(function () {
+      keyElement.remove()
+    }, 1500);
+  }
 }
 
 function initCanvas4PyGame() {
-    let currentTarget = resetTurtleTarget();
+  let currentTarget = resetTurtleTarget();
 
-    let div1 = document.createElement("div");
+  let div1 = document.createElement("div");
 
-    if (currentTarget !== null) {
-      currentTarget.appendChild(div1);
-      $(div1).addClass("modal");
-      $(div1).css("text-align", "center");
-      $(div1).css("display", "none");
+  if (currentTarget !== null) {
+    currentTarget.appendChild(div1);
+    $(div1).addClass("modal");
+    $(div1).css("text-align", "center");
+    $(div1).css("display", "none");
 
-      let div2 = document.createElement("div");
-      $(div2).addClass("modal-dialog modal-lg");
-      $(div2).css("display", "inline-block");
+    let div2 = document.createElement("div");
+    $(div2).addClass("modal-dialog modal-lg");
+    $(div2).css("display", "inline-block");
 
-      // I'm not sure what the code below was supposed to do,
-      // but it was referring to 'self.width' which does not
-      // exist, and the result would be 'undefined + 42 == NaN'.
-      //
-      // (as any to make TypeScript allow the nonsensical addition)
-      $(div2).width(undefined as any + 42);
-      $(div2).attr("role", "document");
-      div1.appendChild(div2);
+    // I'm not sure what the code below was supposed to do,
+    // but it was referring to 'self.width' which does not
+    // exist, and the result would be 'undefined + 42 == NaN'.
+    //
+    // (as any to make TypeScript allow the nonsensical addition)
+    $(div2).width(undefined as any + 42);
+    $(div2).attr("role", "document");
+    div1.appendChild(div2);
 
-      let div3 = document.createElement("div");
-      $(div3).addClass("modal-content");
-      div2.appendChild(div3);
+    let div3 = document.createElement("div");
+    $(div3).addClass("modal-content");
+    div2.appendChild(div3);
 
-      let div4 = document.createElement("div");
-      $(div4).addClass("modal-header d-flex justify-content-between");
-      let div5 = document.createElement("div");
-      $(div5).addClass("modal-body");
-      let div6 = document.createElement("div");
-      $(div6).addClass("modal-footer");
-      let div7 = document.createElement("div");
-      $(div7).addClass("col-md-8");
-      let div8 = document.createElement("div");
-      $(div8).addClass("col-md-4");
+    let div4 = document.createElement("div");
+    $(div4).addClass("modal-header d-flex justify-content-between");
+    let div5 = document.createElement("div");
+    $(div5).addClass("modal-body");
+    let div6 = document.createElement("div");
+    $(div6).addClass("modal-footer");
+    let div7 = document.createElement("div");
+    $(div7).addClass("col-md-8");
+    let div8 = document.createElement("div");
+    $(div8).addClass("col-md-4");
 
-      div3.appendChild(div4);
-      div3.appendChild(div5);
-      div3.appendChild(div6);
+    div3.appendChild(div4);
+    div3.appendChild(div5);
+    div3.appendChild(div6);
 
-      $(Sk.main_canvas).css("border", "none");
-      $(Sk.main_canvas).css("display", "none");
-      div5.appendChild(Sk.main_canvas);
-    }
+    $(Sk.main_canvas).css("border", "none");
+    $(Sk.main_canvas).css("display", "none");
+    div5.appendChild(Sk.main_canvas);
+  }
 }
 
 function initSkulpt4Pygame() {
-    Sk.main_canvas = document.createElement("canvas");
-    Sk.configure({
-        killableWhile: true,
-        killableFor: true,
-        __future__: Sk.python3,
-    });
+  Sk.main_canvas = document.createElement("canvas");
+  Sk.configure({
+    killableWhile: true,
+    killableFor: true,
+    __future__: Sk.python3,
+  });
 }
 
 function speak(text: string) {
@@ -1292,7 +1589,7 @@ function initializeSpeech() {
    * on testing periodically until we got it or it's taken too long to finish.
    */
   let attempts = 0;
-  const timer = setInterval(function() {
+  const timer = setInterval(function () {
     attempts += 1;
 
     const voices = findVoices(theLanguage);
@@ -1325,11 +1622,11 @@ function initializeSpeech() {
 }
 
 export function load_quiz(level: string) {
-  $('*[data-tabtarget="quiz"]').html ('<iframe id="quiz-iframe" class="w-full" title="Quiz" src="/quiz/start/' + level + '"></iframe>');
+  $('*[data-tabtarget="quiz"]').html('<iframe id="quiz-iframe" class="w-full" title="Quiz" src="/quiz/start/' + level + '"></iframe>');
 }
 
 export function showVariableView() {
-// When blue label button is clicked, the view will appear or hide
+  // When blue label button is clicked, the view will appear or hide
   const variables = $('#variables');
   if (variables.is(":hidden")) {
     variables.show();
@@ -1356,40 +1653,40 @@ async function store_parsons_attempt(order: Array<string>, correct: boolean) {
 
 // Todo: As the parsons functionality will rapidly increase, we should probably all store this in a dedicated file (?)
 function get_parsons_code() {
-    let code = "";
-    let count = 1;
-    let order = new Array();
-    let mistake = false;
+  let code = "";
+  let count = 1;
+  let order = new Array();
+  let mistake = false;
 
-    $('.compiler-parsons-box').each(function() {
-      // We are only interested in the visible code lines
-      if ($(this).parent().is(':visible')) {
-        // When the value is 0 there is no code box in the expected spot
-        let text = $(this).attr('code') || "";
-        if (text.length > 1) {
-          // Also add a newline as we removed this from the YAML structure
-          code += text + "\n";
-        }
-        $(this).parents().removeClass('border-black');
-        let index = $(this).attr('index') || 999;
-        if (index == count) {
-          $(this).parents().addClass('border-green-500');
-        } else {
-          mistake = true;
-          $(this).parents().addClass('border-red-500');
-        }
-        order.push(index);
-        count += 1;
+  $('.compiler-parsons-box').each(function () {
+    // We are only interested in the visible code lines
+    if ($(this).parent().is(':visible')) {
+      // When the value is 0 there is no code box in the expected spot
+      let text = $(this).attr('code') || "";
+      if (text.length > 1) {
+        // Also add a newline as we removed this from the YAML structure
+        code += text + "\n";
       }
-    });
-    // Before returning the code we want to a-sync store the attempt in the database
-    // We only have to set the order and level, rest is handled by the back-end
-    store_parsons_attempt(order, !mistake);
-    if (mistake) {
-      return "";
+      $(this).parents().removeClass('border-black');
+      let index = $(this).attr('index') || 999;
+      if (index == count) {
+        $(this).parents().addClass('border-green-500');
+      } else {
+        mistake = true;
+        $(this).parents().addClass('border-red-500');
+      }
+      order.push(index);
+      count += 1;
     }
+  });
+  // Before returning the code we want to a-sync store the attempt in the database
+  // We only have to set the order and level, rest is handled by the back-end
+  store_parsons_attempt(order, !mistake);
+  if (mistake) {
+    return "";
+  }
 
-    return code.replace(/ +$/mg, '');
+  return code.replace(/ +$/mg, '');
 }
 
 export function get_active_and_trimmed_code() {
@@ -1407,19 +1704,19 @@ export function get_active_and_trimmed_code() {
   return code;
 }
 
-export function confetti_cannon(){
+export function confetti_cannon() {
   const canvas = document.getElementById('confetti');
   if (canvas) {
     canvas.classList.remove('hidden');
     // ignore this error, the function comes from CDN for now
-    const jsConfetti = new JSConfetti({canvas})
+    const jsConfetti = new JSConfetti({ canvas })
     // timeout for the confetti to fall down
-    setTimeout(function(){canvas.classList.add('hidden')}, 3000);
+    setTimeout(function () { canvas.classList.add('hidden') }, 3000);
     let adventures = $('#adventures');
     let currentAdventure = $(adventures).find('.tab-selected').attr('data-tab');
     let customLevels = ['turtle', 'rock', 'haunted', 'restaurant', 'fortune', 'songs', 'dice']
 
-    if(customLevels.includes(currentAdventure!)){
+    if (customLevels.includes(currentAdventure!)) {
       let currentAdventureConfetti = getConfettiForAdventure(currentAdventure ?? '' as any);
 
       jsConfetti.addConfetti({
@@ -1439,7 +1736,7 @@ export function confetti_cannon(){
   }
 }
 
-function getConfettiForAdventure(adventure: MessageKey){
+function getConfettiForAdventure(adventure: MessageKey) {
   if (ClientMessages[adventure]) {
     return Array.from(ClientMessages[adventure]).filter(x => x !== ',' && x !== ' ');
   }
@@ -1454,20 +1751,20 @@ function scrollOutputToBottom() {
   outputDiv.scrollTop(outputDiv.prop('scrollHeight'));
 }
 
-export function modalStepOne(level: number){
+export function modalStepOne(level: number) {
   createModal(level);
   let modal_editor = $('#modal-editor');
   initializeModalEditor(modal_editor);
 }
 
-function showSuccesMessage(){
+function showSuccesMessage() {
   removeBulb();
   var allsuccessmessages = ClientMessages['Transpile_success'].split('\n');
   var randomnum: number = Math.floor(Math.random() * allsuccessmessages.length);
   success.show(allsuccessmessages[randomnum]);
 }
 
-function createModal(level:number ){
+function createModal(level: number) {
   let editor = "<div id='modal-editor' class=\"w-full flex-1 text-lg rounded\" style='height:200px; width:50vw;'></div>".replace("{level}", level.toString());
   let title = ClientMessages['Program_repair'];
   modal.repair(editor, 0, title);
@@ -1522,24 +1819,24 @@ function initializeModalEditor($editor: JQuery) {
   // Load existing code from session, if it exists
   const storage = window.sessionStorage;
   if (storage) {
-      let tempIndex = 0;
-      let resultString = "";
+    let tempIndex = 0;
+    let resultString = "";
 
-      if(storage.getItem('fixed_{lvl}'.replace("{lvl}", currentTabLsKey()))){
-        resultString = storage.getItem('fixed_{lvl}'.replace("{lvl}", currentTabLsKey()))?? "";
-        let tempString = ""
-        for (let i = 0; i < resultString.length + 1; i++) {
-          setTimeout(function() {
-            editor.setValue(tempString,tempIndex);
-            tempString += resultString[tempIndex];
-            tempIndex++;
-          }, 150 * i);
-        }
+    if (storage.getItem('fixed_{lvl}'.replace("{lvl}", currentTabLsKey()))) {
+      resultString = storage.getItem('fixed_{lvl}'.replace("{lvl}", currentTabLsKey())) ?? "";
+      let tempString = ""
+      for (let i = 0; i < resultString.length + 1; i++) {
+        setTimeout(function () {
+          editor.setValue(tempString, tempIndex);
+          tempString += resultString[tempIndex];
+          tempIndex++;
+        }, 150 * i);
       }
-      else{
-        resultString = storage.getItem('warning_{lvl}'.replace("{lvl}", currentTabLsKey()))?? "";
-        editor.setValue(resultString);
-      }
+    }
+    else {
+      resultString = storage.getItem('warning_{lvl}'.replace("{lvl}", currentTabLsKey())) ?? "";
+      editor.setValue(resultString);
+    }
   }
 
   // *** KEYBOARD SHORTCUTS ***
@@ -1547,24 +1844,25 @@ function initializeModalEditor($editor: JQuery) {
   let altPressed: boolean | undefined;
 
   // alt is 18, enter is 13
-  window.addEventListener ('keydown', function (ev) {
+  window.addEventListener('keydown', function (ev) {
     const keyCode = ev.keyCode;
     if (keyCode === 18) {
       altPressed = true;
       return;
     }
     if (keyCode === 13 && altPressed) {
-      runit (theLevel, theLanguage, "", function () {
-        $ ('#output').focus ();
+      runit_different(theLevel, theLanguage, "", function () {
+        $('#output').focus();
       });
+
     }
     // We don't use jquery because it doesn't return true for this equality check.
-    if (keyCode === 37 && document.activeElement === document.getElementById ('output')) {
-      editor.focus ();
-      editor.navigateFileEnd ();
+    if (keyCode === 37 && document.activeElement === document.getElementById('output')) {
+      editor.focus();
+      editor.navigateFileEnd();
     }
   });
-  window.addEventListener ('keyup', function (ev) {
+  window.addEventListener('keyup', function (ev) {
     const keyCode = ev.keyCode;
     if (keyCode === 18) {
       altPressed = false;
@@ -1576,12 +1874,12 @@ function initializeModalEditor($editor: JQuery) {
 
 export function toggle_developers_mode(enforced: boolean) {
   if ($('#developers_toggle').is(":checked") || enforced) {
-      $('#adventures-tab').hide();
-      $('#blur_toggle_container').show();
-      pushAchievement("lets_focus");
+    $('#adventures-tab').hide();
+    $('#blur_toggle_container').show();
+    pushAchievement("lets_focus");
   } else {
-      $('#blur_toggle_container').hide();
-      $('#adventures-tab').show();
+    $('#blur_toggle_container').hide();
+    $('#adventures-tab').show();
   }
 
   if ($('#adventures-tab').is(":hidden")) {
@@ -1662,7 +1960,7 @@ export function change_keyword_language(start_lang: string, new_lang: string) {
 }
 
 function update_view(selector_container: string, new_lang: string) {
-  $('#' + selector_container + ' > div').map(function() {
+  $('#' + selector_container + ' > div').map(function () {
     if ($(this).attr('lang') == new_lang) {
       $(this).show();
     } else {
@@ -1745,9 +2043,9 @@ const clearTimeouts = () => {
 };
 
 export function downloadSlides(level: number) {
-  var iframe : any = document.getElementById(`level-${level}-slides`)!;
-  iframe.setAttribute('src',`/slides/${level}`);
-  $(`#level-${level}-slides`).on('load', function (){
+  var iframe: any = document.getElementById(`level-${level}-slides`)!;
+  iframe.setAttribute('src', `/slides/${level}`);
+  $(`#level-${level}-slides`).on('load', function () {
     var innerDoc = iframe.contentDocument || iframe.contentWindow.document;
     var slides = innerDoc.getElementsByTagName('section');
     var slidesHTML = ''
@@ -1760,7 +2058,7 @@ export function downloadSlides(level: number) {
         slides[i].appendChild(a);
         slides[i].removeChild(innerIframe[j]);
       }
-      slidesHTML += '\n'+ slides[i].outerHTML;
+      slidesHTML += '\n' + slides[i].outerHTML;
     }
 
     var template = slides_template.replace('{replace}', slidesHTML);
@@ -1768,22 +2066,22 @@ export function downloadSlides(level: number) {
     zip.file('index.html', template);
     zip.folder("lib");
     zip.folder(`hedy-level-${level}`);
-    zip.generateAsync({type: 'blob'})
-       .then(function(content: any) {
-          download(content, `hedy-level-${level}.zip`, "zip");
-       });
+    zip.generateAsync({ type: 'blob' })
+      .then(function (content: any) {
+        download(content, `hedy-level-${level}.zip`, "zip");
+      });
   })
 }
 
 function download(data: any, filename: any, type: any) {
-  var file = new Blob([data], {type: type});
+  var file = new Blob([data], { type: type });
   var a = document.createElement("a"),
-  url = URL.createObjectURL(file);
+    url = URL.createObjectURL(file);
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
-  setTimeout(function() {
+  setTimeout(function () {
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
   }, 0);
@@ -1795,9 +2093,9 @@ function download(data: any, filename: any, type: any) {
  * Reset the state of the editor.
  */
 function resetWindow() {
-  $('#warningbox').hide ();
-  $('#errorbox').hide ();
-  $('#okbox').hide ();
+  $('#warningbox').hide();
+  $('#errorbox').hide();
+  $('#okbox').hide();
   $('#repair_button').hide();
   const output = $('#output');
   const variable_button = $(output).find('#variable_button');
@@ -1833,7 +2131,7 @@ function updatePageElements() {
   if (adventure) {
     const saveInfo: ServerSaveInfo = isServerSaveInfo(adventure.save_info)
       ? adventure.save_info
-      : { id : '*dummy*' };
+      : { id: '*dummy*' };
 
     // SHARING SETTINGS
     // Star on "share" button is filled if program is already public, outlined otherwise
@@ -1875,7 +2173,7 @@ function reconfigurePageBasedOnTab() {
 
   const adventure = theAdventures[currentTab];
   if (adventure) {
-    $ ('#program_name').val(adventure.save_name);
+    $('#program_name').val(adventure.save_name);
     theGlobalEditor?.setValue(adventure.start_code, MOVE_CURSOR_TO_END);
   }
 }
@@ -1924,26 +2222,26 @@ function initializeShareProgramButtons() {
 
 function initializeHandInButton() {
   $('#do_hand_in_button').on('click', () => {
-      // Async-safe copy of current tab
-      const adventure = theAdventures[currentTab];
+    // Async-safe copy of current tab
+    const adventure = theAdventures[currentTab];
 
-      tryCatchPopup(async () => {
-        await saveIfNecessary();
+    tryCatchPopup(async () => {
+      await saveIfNecessary();
 
-        const saveInfo = isServerSaveInfo(adventure?.save_info) ? adventure.save_info : undefined;
-        if (!saveInfo) {
-          throw new Error('This program does not have an id');
-        }
-        const response = await postJsonWithAchievements('/programs/submit', {
-          id: saveInfo.id,
-        });
-
-        modal.notifySuccess(response.message);
-        if (response.save_info) {
-          adventure.save_info = response.save_info;
-        }
-        updatePageElements();
+      const saveInfo = isServerSaveInfo(adventure?.save_info) ? adventure.save_info : undefined;
+      if (!saveInfo) {
+        throw new Error('This program does not have an id');
+      }
+      const response = await postJsonWithAchievements('/programs/submit', {
+        id: saveInfo.id,
       });
+
+      modal.notifySuccess(response.message);
+      if (response.save_info) {
+        adventure.save_info = response.save_info;
+      }
+      updatePageElements();
+    });
   });
 }
 
@@ -2024,9 +2322,9 @@ async function saveIfNecessary() {
     const saveInfo = isServerSaveInfo(adventure.save_info) ? adventure.save_info : undefined;
     const response = await postJsonWithAchievements('/programs', {
       level: theLevel,
-      lang:  theLanguage,
-      name:  saveName,
-      code:  code,
+      lang: theLanguage,
+      name: saveName,
+      code: code,
       adventure_name: adventureName,
       program_id: saveInfo?.id,
       // We pass 'public' in here to save the backend a lookup

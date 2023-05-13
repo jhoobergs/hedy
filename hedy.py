@@ -32,6 +32,8 @@ local_keywords_enabled = True
 
 # dictionary to store transpilers
 TRANSPILER_LOOKUP = {}
+AMPERSAND_LOOKUP = {}
+
 
 # builtins taken from 3.11.0 docs: https://docs.python.org/3/library/functions.html
 PYTHON_BUILTIN_FUNCTIONS = [
@@ -1286,6 +1288,13 @@ def hedy_transpiler(level):
         return c
     return decorator
 
+# decorator used to store each class in the ampersand lookup table
+def hedy_ampersand(level):
+    def decorator(c):
+        AMPERSAND_LOOKUP[level] = c
+        c.level = level
+        return c
+    return decorator
 
 @v_args(meta=True)
 class ConvertToPython(Transformer):
@@ -3108,3 +3117,269 @@ def execute(input_string, level):
     if python.has_turtle:
         raise exceptions.HedyException("hedy.execute doesn't support turtle")
     exec(python.code)
+
+@v_args(meta=True)
+class ConvertToAmpersand(Transformer):
+    def __init__(self, lookup, numerals_language="Latin"):
+        self.lookup = lookup
+        self.numerals_language = numerals_language
+
+    # default for line number is max lines so if it is not given, there
+    # is no check on whether the var is defined
+    def is_variable(self, variable_name, access_line_number=100):
+        all_names = [a.name for a in self.lookup]
+        all_names_before_access_line = [a.name for a in self.lookup if a.linenumber <= access_line_number]
+
+        if variable_name in all_names and variable_name not in all_names_before_access_line:
+            # referenced before assignment!
+            definition_line_number = [a.linenumber for a in self.lookup if a.name == variable_name][0]
+            raise hedy.exceptions.AccessBeforeAssign(
+                name=variable_name,
+                access_line_number=access_line_number,
+                definition_line_number=definition_line_number)
+
+        is_function = False
+        if isinstance(variable_name, str):
+            pattern = r'^([a-zA-Z_][a-zA-Z0-9_]*)\('
+            match = re.match(pattern, variable_name)
+            is_function = match and [a.name for a in self.lookup if match.group(1) + "()" == a.name]
+
+        return escape_var(variable_name) in all_names_before_access_line or is_function
+
+    def process_variable(self, arg, access_line_number=100):
+        # processes a variable by hashing and escaping when needed
+        if self.is_variable(arg, access_line_number):
+            return escape_var(arg)
+        if ConvertToPython.is_quoted(arg):
+            arg = arg[1:-1]
+        return f"'{process_characters_needing_escape(arg)}'"
+
+    def process_variable_for_fstring(self, variable_name, access_line_number=100):
+        if self.is_variable(variable_name, access_line_number):
+            return "{" + escape_var(variable_name) + "}"
+        else:
+            return process_characters_needing_escape(variable_name)
+
+    def process_variable_for_comparisons(self, name):
+        # used to transform variables in comparisons
+        if self.is_variable(name):
+            return f"convert_numerals('{self.numerals_language}', {escape_var(name)})"
+        elif ConvertToPython.is_float(name):
+            return f"convert_numerals('{self.numerals_language}', {name})"
+        elif ConvertToPython.is_quoted(name):
+            return f"{name}"
+
+    def make_f_string(self, args):
+        argument_string = ''
+        for argument in args:
+            if self.is_variable(argument):
+                # variables are placed in {} in the f string
+                argument_string += "{" + escape_var(argument) + "}"
+            else:
+                # strings are written regularly
+                # however we no longer need the enclosing quotes in the f-string
+                # the quotes are only left on the argument to check if they are there.
+                argument_string += argument.replace("'", '')
+
+        return f"print(f'{argument_string}')"
+
+    def get_fresh_var(self, name):
+        while self.is_variable(name):
+            name = '_' + name
+        return name
+
+    def check_var_usage(self, args, var_access_linenumber=100):
+        # this function checks whether arguments are valid
+        # we can proceed if all arguments are either quoted OR all variables
+
+        def is_var_candidate(arg) -> bool:
+            return not isinstance(arg, Tree) and \
+                not ConvertToPython.is_int(arg) and \
+                not ConvertToPython.is_float(arg)
+
+        args_to_process = [a for a in args if is_var_candidate(a)]  # we do not check trees (calcs) they are always ok
+
+        unquoted_args = [a for a in args_to_process if not ConvertToPython.is_quoted(a)]
+        unquoted_in_lookup = [self.is_variable(a, var_access_linenumber) for a in unquoted_args]
+
+        if unquoted_in_lookup == [] or all(unquoted_in_lookup):
+            # all good? return for further processing
+            return args
+        else:
+            # TODO: check whether this is really never raised??
+            # return first name with issue
+            first_unquoted_var = unquoted_args[0]
+            raise exceptions.UndefinedVarException(name=first_unquoted_var, line_number=var_access_linenumber)
+
+    # static methods
+    @staticmethod
+    def is_quoted(s):
+        opening_quotes = ['‘', "'", '"', "“", "«"]
+        closing_quotes = ['’', "'", '"', "”", "»"]
+        return len(s) > 1 and (s[0] in opening_quotes and s[-1] in closing_quotes)
+
+    @staticmethod
+    def is_int(n):
+        try:
+            int(n)
+            return True
+        except ValueError:
+            return False
+
+    @staticmethod
+    def is_float(n):
+        try:
+            float(n)
+            return True
+        except ValueError:
+            return False
+
+    @staticmethod
+    def is_random(s):
+        return 'random.choice' in s
+
+    @staticmethod
+    def is_list(s):
+        return '[' in s and ']' in s
+
+    @staticmethod
+    def indent(s, spaces_amount=2):
+        lines = s.split('\n')
+        return '\n'.join([' ' * spaces_amount + line for line in lines])
+
+
+@v_args(meta=True)
+@hedy_ampersand(level=1)
+class ConvertToAmpersand_1(ConvertToAmpersand):
+
+    def __init__(self, lookup, numerals_language):
+        self.numerals_language = numerals_language
+        self.lookup = lookup
+        __class__.level = 1
+
+    def program(self, meta, args):
+        return {
+            "type": "comp",
+            "content": args
+        }
+
+    def command(self, meta, args):
+        return args[0]
+
+    def text(self, meta, args):
+        return {
+            "type": "string",
+            "content": ''.join([str(c) for c in args])
+        }
+
+    def integer(self, meta, args):
+        # remove whitespaces
+        return {
+            "type": "string",
+            "content": str(int(args[0].replace(' ', '')))
+        }
+
+    def number(self, meta, args):
+        return int(args[0])
+
+    def NEGATIVE_NUMBER(self, meta, args):
+        return int(args[0])
+
+    def print(self, meta, args):
+        return {
+            "type": "print",
+            "content": args[0]
+        }
+
+    def ask(self, meta, args):
+         return {
+            "type": "ask",
+            "content": args[0]["content"] # put string directly
+        }
+
+    def echo(self, meta, args):
+         return {
+            "type": "echo",
+            "content": args[0]["content"] if len(args) > 0 else ''
+        }
+
+    def comment(self, meta, args):
+        # TODO
+        return f"#{''.join(args)}"
+
+    def empty_line(self, meta, args):
+        # TODO
+        return ''
+
+    def forward(self, meta, args):
+        return {
+            "type": "forward",
+            "content": int(args[0]) if len(args) > 0 else 50
+        }
+
+
+    def color(self, meta, args):
+         return {
+            "type": "color",
+            "content": args[0].data if len(args) > 0 else "black"
+        }
+
+    def turn(self, meta, args):
+         return {
+            "type": "turn",
+            "content": args[0].data if len(args) > 0 else "right"
+        }
+
+def transpile_ampersand(input_string, level, lang="en"):
+    transpile_result = transpile_ampersand_inner(input_string, level, lang)
+    return transpile_result
+
+def transpile_ampersand_inner(input_string, level, lang="en"):
+    check_program_size_is_valid(input_string)
+
+    level = int(level)
+    if level > HEDY_MAX_LEVEL:
+        raise Exception(f'Levels over {HEDY_MAX_LEVEL} not implemented yet')
+
+    input_string = process_input_string(input_string, level, lang)
+    program_root = parse_input(input_string, level, lang)
+
+    # checks whether any error production nodes are present in the parse tree
+    is_program_valid(program_root, input_string, level, lang)
+
+    try:
+        abstract_syntax_tree = ExtractAST().transform(program_root)
+
+        is_program_complete(abstract_syntax_tree, level)
+
+        if not valid_echo(abstract_syntax_tree):
+            raise exceptions.LonelyEchoException()
+
+        lookup_table = create_lookup_table(abstract_syntax_tree, level, lang, input_string)
+
+        # FH, may 2022. for now, we just out arabic numerals when the language is ar
+        # this can be changed into a profile setting or could be detected
+        # in usage of programs
+
+        if lang == "ar":
+            numerals_language = "Arabic"
+        else:
+            numerals_language = "Latin"
+        # grab the right transpiler from the lookup
+        convertToPython = AMPERSAND_LOOKUP[level]
+        ampersand = convertToPython(lookup_table, numerals_language).transform(abstract_syntax_tree)
+
+        uses_turtle = UsesTurtle()
+        has_turtle = uses_turtle.transform(abstract_syntax_tree)
+
+        uses_pygame = UsesPyGame()
+        has_pygame = uses_pygame.transform(abstract_syntax_tree)
+
+        return ParseResult(ampersand, has_turtle, has_pygame)
+    except VisitError as E:
+        # Exceptions raised inside visitors are wrapped inside VisitError. Unwrap it if it is a
+        # HedyException to show the intended error message.
+        if isinstance(E.orig_exc, exceptions.HedyException):
+            raise E.orig_exc
+        else:
+            raise E

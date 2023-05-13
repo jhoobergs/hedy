@@ -589,6 +589,133 @@ def parse():
         response["message"] = gettext('program_contains_error')
     return jsonify(response)
 
+@app.route('/parse_ampersand', methods=['POST'])
+def parse_ampersand():
+    body = request.json
+    if not body:
+        return "body must be an object", 400
+    if 'code' not in body:
+        return "body.code must be a string", 400
+    if 'level' not in body:
+        return "body.level must be a string", 400
+    if 'adventure_name' in body and not isinstance(body['adventure_name'], str):
+        return "if present, body.adventure_name must be a string", 400
+
+    error_check = False
+    if 'error_check' in body:
+        error_check = True
+
+    code = body['code']
+    level = int(body['level'])
+
+    # Language should come principally from the request body,
+    # but we'll fall back to browser default if it's missing for whatever
+    # reason.
+    lang = body.get('lang', g.lang)
+
+    # true if kid enabled the read aloud option
+    read_aloud = body.get('read_aloud', False)
+
+    response = {}
+    username = current_user()['username'] or None
+    exception = None
+
+    querylog.log_value(level=level, lang=lang,
+                       session_id=utils.session_id(), username=username)
+
+    try:
+        keyword_lang = current_keyword_language()["lang"]
+        with querylog.log_time('transpile'):
+            try:
+                transpile_result = transpile_ampersand_add_stats(code, level, lang)
+                if username and not body.get('tutorial'):
+                    DATABASE.increase_user_run_count(username)
+                    ACHIEVEMENTS.increase_count("run")
+            except hedy.exceptions.WarningException as ex: # TODO
+                translated_error = translate_error(ex.error_code, ex.arguments, keyword_lang)
+                if isinstance(ex, hedy.exceptions.InvalidSpaceException):
+                    response['Warning'] = translated_error
+                else:
+                    response['Error'] = translated_error
+                response['Location'] = ex.error_location
+                response['FixedCode'] = ex.fixed_code
+                transpile_result = ex.fixed_result
+                exception = ex
+            except hedy.exceptions.UnquotedEqualityCheck as ex:
+                response['Error'] = translate_error(ex.error_code, ex.arguments, keyword_lang)
+                response['Location'] = ex.error_location
+                exception = ex
+
+        try:
+            response['Code'] = json.dumps(transpile_result.code, indent=2)
+
+            if transpile_result.has_pygame:
+                response['has_pygame'] = True
+
+            if transpile_result.has_turtle:
+                response['has_turtle'] = True
+        except Exception:
+            pass
+
+        try:
+            response['has_sleep'] = 'sleep' in hedy.all_commands(code, level, lang)
+        except BaseException:
+            pass
+        try:
+            if username and not body.get('tutorial') and ACHIEVEMENTS.verify_run_achievements(
+                    username, code, level, response):
+                response['achievements'] = ACHIEVEMENTS.get_earned_achievements()
+        except Exception as E:
+            print(f"error determining achievements for {code} with {E}")
+
+    except hedy.exceptions.HedyException as ex:
+        traceback.print_exc()
+        response = hedy_error_to_response(ex)
+        exception = ex
+
+    except Exception as E:
+        traceback.print_exc()
+        print(f"error transpiling {code}")
+        response["Error"] = str(E)
+        exception = E
+
+    # Save this program (if the user is logged in)
+    if username and body.get('save_name'):
+        try:
+            program_logic = programs.ProgramsLogic(DATABASE, ACHIEVEMENTS)
+            program = program_logic.store_user_program(
+                user=current_user(),
+                level=level,
+                name=body.get('save_name'),
+                program_id=body.get('program_id'),
+                adventure_name=body.get('adventure_name'),
+                code=code,
+                error=exception is not None)
+
+            response['save_info'] = SaveInfo.from_program(Program.from_database_row(program))
+        except programs.NotYourProgramError:
+            # No permissions to overwrite, no biggie
+            pass
+
+    querylog.log_value(server_error=response.get('Error'))
+    parse_logger.log({
+        'session': utils.session_id(),
+        'date': str(datetime.datetime.now()),
+        'level': level,
+        'lang': lang,
+        'code': code,
+        'server_error': response.get('Error'),
+        'exception': get_class_name(exception),
+        'version': version(),
+        'username': username,
+        'read_aloud': read_aloud,
+        'is_test': 1 if os.getenv('IS_TEST_ENV') else None,
+        'adventure_name': body.get('adventure_name', None)
+    })
+
+    if "Error" in response and error_check:
+        response["message"] = gettext('program_contains_error')
+    return jsonify(response)
 
 @app.route('/parse-by-id', methods=['POST'])
 @requires_login
@@ -702,6 +829,20 @@ def transpile_add_stats(code, level, lang_):
             id_, level, number_of_lines, class_name))
         raise
 
+
+def transpile_ampersand_add_stats(code, level, lang_):
+    username = current_user()['username'] or None
+    number_of_lines = code.count('\n')
+    try:
+        result = hedy.transpile_ampersand(code, level, lang_)
+        statistics.add(
+            username, lambda id_: DATABASE.add_program_stats(id_, level, number_of_lines, None))
+        return result
+    except Exception as ex:
+        class_name = get_class_name(ex)
+        statistics.add(username, lambda id_: DATABASE.add_program_stats(
+            id_, level, number_of_lines, class_name))
+        raise
 
 def get_class_name(i):
     if i is not None:
