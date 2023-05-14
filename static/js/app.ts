@@ -997,6 +997,38 @@ function setAmpersandWorker(): Promise<Worker> {
     let stroke_color = "#000000";
     let angle = 3 * Math.PI / 2;
 
+    let DOMURL = window.URL || window.webkitURL || window;
+   
+
+    let turtle_canvas = document.getElementById("drawcanvas_turtle") as HTMLCanvasElement;
+    let turtle_ctx = turtle_canvas.getContext("2d")!;
+
+    function turtle_svg(color: String) : String {
+      return `
+     <svg width="10" height="13" xmlns="http://www.w3.org/2000/svg">
+ <g>
+  <ellipse ry="1.93749" rx="2.18749" id="svg_4" cy="2.12501" cx="5.31249" stroke="${color}" fill="#fff"/>
+  <line y2="12.81248" x2="8.62498" y1="2.31251" x1="1.62501" stroke="${color}" fill="none"/>
+  <line y2="12.31248" x2="2.375" y1="2.81251" x1="8.62498" stroke="${color}" fill="none"/>
+ </g>
+</svg>
+     `;
+    }
+
+    function draw_turtle(color: String) {
+      let turtle_img = new Image();
+      let svg = new Blob([turtle_svg(color)], {type: 'image/svg+xml'});
+      let turtle_url = DOMURL.createObjectURL(svg);
+
+      turtle_ctx.clearRect(0, 0, turtle_ctx.canvas.width, turtle_ctx.canvas.height);
+      turtle_img.onload = function() {
+        turtle_ctx.drawImage(turtle_img, draw_location[0] -5, draw_location[1]-6);
+        DOMURL.revokeObjectURL(turtle_url);
+     }
+     turtle_img.src = turtle_url;
+    }
+    draw_turtle(stroke_color);
+    
            
 
     let ampersand_worker = new Worker("vendor/ampersand_worker.js");
@@ -1065,6 +1097,8 @@ function setAmpersandWorker(): Promise<Worker> {
             ctx.lineTo(draw_location[0], draw_location[1]);
             ctx.stroke();
 
+            draw_turtle(stroke_color);
+
             //show_canvas()
             timeoutHandler = setTimeout(function () {
               ampersand_worker.postMessage({
@@ -1076,6 +1110,8 @@ function setAmpersandWorker(): Promise<Worker> {
 
             let radians = sys_call.degrees * (Math.PI / 180)
             angle = (angle + radians);
+
+            draw_turtle(stroke_color);
 
             //show_canvas()
             timeoutHandler = setTimeout(function () {
@@ -1093,6 +1129,8 @@ function setAmpersandWorker(): Promise<Worker> {
             } else if (turn == "left") {
               angle = (angle - Math.PI / 2)
             }
+
+            draw_turtle(stroke_color);
 
             //show_canvas()
             timeoutHandler = setTimeout(function () {
@@ -1114,6 +1152,8 @@ function setAmpersandWorker(): Promise<Worker> {
                 stroke_color = "#FF0000";
               }
             }
+
+            draw_turtle(stroke_color);
 
             //show_canvas()
             ampersand_worker.postMessage({
