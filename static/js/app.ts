@@ -989,9 +989,18 @@ window.onerror = function reportClientException(message, source, line_number, co
 function setAmpersandWorker(): Promise<Worker> {
   return new Promise(function (ok) {
     let timeoutHandler = undefined;
+    let prompt : String | undefined = undefined;
+    let canvas = document.getElementById("drawcanvas") as HTMLCanvasElement;
+    let ctx = canvas.getContext("2d")!;
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    let draw_location = [360, 150];
+    let stroke_color = "#000000";
+    let angle = 3 * Math.PI / 2;
+
+           
 
     let ampersand_worker = new Worker("vendor/ampersand_worker.js");
-    ampersand_worker.onmessage = (e: { data: L1StepRes | { type: "worker_is_ready" } }) => {
+    ampersand_worker.onmessage = (e: { data: L1StepRes | L2StepRes | { type: "worker_is_ready" } }) => {
       //console.log("Message received from worker");
       let complete_last_result = e.data;
       console.log(complete_last_result);
@@ -1025,50 +1034,58 @@ function setAmpersandWorker(): Promise<Worker> {
             /*fix_buttons(false, false);
             input_text.innerText = sys_call.question || "";
             */
+            prompt = sys_call.question;
             ampersand_worker.postMessage({
               type: "continue",
             });
           } else if (sys_call.type === "waiting_for_input") {
-            /*fix_buttons(false, false);
-            input_container.style.display = "block";
-            input.focus();
-          }*/
-           /*else if (sys_call.type === "sleep") {
-            /*fix_buttons(false, false);/
+            inputFromInlineModal(prompt as string).then(x => {
+              ampersand_worker.postMessage({
+                type: "input",
+                input: x
+              });
+            })
+          }
+          else if (sys_call.type === "sleep") {
+            /*fix_buttons(false, false);*/
             timeoutHandler = setTimeout(function () {
               ampersand_worker.postMessage({
                 type: "continue",
               });
-            }, sys_call.seconds * 1000)*/
+            }, sys_call.seconds * 1000)
           } else if (sys_call.type === "turtle_forward") {
-            /*fix_buttons(false, false);
+            /*fix_buttons(false, false);*/
 
             let forward = sys_call.amount;
             ctx.beginPath();
             ctx.moveTo(draw_location[0], draw_location[1]);
             draw_location = [draw_location[0] + forward * Math.cos(angle), draw_location[1] + forward * Math.sin(angle)]
-            ctx.lineWidth = "2";
+            ctx.lineWidth = 2;
             ctx.strokeStyle = stroke_color;
             ctx.lineTo(draw_location[0], draw_location[1]);
             ctx.stroke();
 
-            show_canvas()*/
-            ampersand_worker.postMessage({
-              type: "continue",
-            });
-          } //else if (sys_call.type === "turtle_turn_degrees") {
-            /*fix_buttons(false, false);
+            //show_canvas()
+            timeoutHandler = setTimeout(function () {
+              ampersand_worker.postMessage({
+                type: "continue",
+              });
+            }, 100)
+          } else if (sys_call.type === "turtle_turn_degrees") {
+            /*fix_buttons(false, false);*/
 
             let radians = sys_call.degrees * (Math.PI / 180)
             angle = (angle + radians);
 
-            show_canvas()*/
-            //ampersand_worker.postMessage({
-            //  type: "continue",
-            //});
-          //}
+            //show_canvas()
+            timeoutHandler = setTimeout(function () {
+              ampersand_worker.postMessage({
+                type: "continue",
+              });
+            }, 100)
+           }
            else if (sys_call.type === "turtle_turn") {
-            /*fix_buttons(false, false);
+            /*fix_buttons(false, false);*/
 
             let turn = sys_call.direction;
             if (turn == "right") {
@@ -1077,12 +1094,14 @@ function setAmpersandWorker(): Promise<Worker> {
               angle = (angle - Math.PI / 2)
             }
 
-            show_canvas() /
-            ampersand_worker.postMessage({
-              type: "continue",
-            }); */
+            //show_canvas()
+            timeoutHandler = setTimeout(function () {
+              ampersand_worker.postMessage({
+                type: "continue",
+              });
+            }, 100)
           } else if (sys_call.type === "turtle_color") {
-            /*fix_buttons(false, false);
+            /*fix_buttons(false, false);*/
 
             let color = sys_call.color;
             if (color) {
@@ -1096,7 +1115,7 @@ function setAmpersandWorker(): Promise<Worker> {
               }
             }
 
-            show_canvas()*/
+            //show_canvas()
             ampersand_worker.postMessage({
               type: "continue",
             });
@@ -1139,6 +1158,36 @@ function outf(text: string) {
   addToOutput(text, 'white');
   speak(text)
 }
+
+// This method draws the prompt for asking for user input.
+function inputFromInlineModal(prompt: string) : Promise<String> {
+    return new Promise(function (ok) {
+      askPromptOpen = true;
+
+      const input = $('#ask-modal input[type="text"]');
+      $('#ask-modal .caption').text(prompt);
+      input.val('');
+      input.attr('placeholder', prompt);
+      speak(prompt)
+
+      setTimeout(function () {
+        input.focus();
+      }, 0);
+      $('#ask-modal form').one('submit', function (event) {
+        askPromptOpen = false;
+        event.preventDefault();
+        $('#ask-modal').hide();
+
+        ok(input.val() as string);
+        $('#output').focus();
+      });
+      $('#ask-modal').show();
+
+      // Scroll the output div to the bottom so you can see the question
+      scrollOutputToBottom();
+    });
+}
+
 
 export function runPythonProgram(this: any, code: string, hasTurtle: boolean, hasPygame: boolean, hasSleep: boolean, hasWarnings: boolean, cb: () => void) {
   // If we are in the Parsons problem -> use a different output
