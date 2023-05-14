@@ -997,16 +997,19 @@ function setAmpersandWorker(): Promise<Worker> {
     let stroke_color = "#000000";
     let angle = 3 * Math.PI / 2;
 
+    const turtle_delay = 500;
+
     let DOMURL = window.URL || window.webkitURL || window;
    
 
     let turtle_canvas = document.getElementById("drawcanvas_turtle") as HTMLCanvasElement;
     let turtle_ctx = turtle_canvas.getContext("2d")!;
 
-    function turtle_svg(color: String) : String {
+    function turtle_svg(color: String, angle: number) : String {
+      let degrees = (angle + Math.PI/2) / Math.PI * 180;
       return `
      <svg width="10" height="13" xmlns="http://www.w3.org/2000/svg">
- <g>
+ <g transform="rotate(${degrees}, 5, 6)">
   <ellipse ry="1.93749" rx="2.18749" id="svg_4" cy="2.12501" cx="5.31249" stroke="${color}" fill="#fff"/>
   <line y2="12.81248" x2="8.62498" y1="2.31251" x1="1.62501" stroke="${color}" fill="none"/>
   <line y2="12.31248" x2="2.375" y1="2.81251" x1="8.62498" stroke="${color}" fill="none"/>
@@ -1015,10 +1018,12 @@ function setAmpersandWorker(): Promise<Worker> {
      `;
     }
 
-    function draw_turtle(color: String) {
+    function draw_turtle(color: String, angle: number) {
       let turtle_img = new Image();
-      let svg = new Blob([turtle_svg(color)], {type: 'image/svg+xml'});
-      let turtle_url = DOMURL.createObjectURL(svg);
+      let svg = turtle_svg(color, angle);
+      console.log(svg)
+      let svg_blob = new Blob([svg], {type: 'image/svg+xml'});
+      let turtle_url = DOMURL.createObjectURL(svg_blob);
 
       turtle_ctx.clearRect(0, 0, turtle_ctx.canvas.width, turtle_ctx.canvas.height);
       turtle_img.onload = function() {
@@ -1027,7 +1032,7 @@ function setAmpersandWorker(): Promise<Worker> {
      }
      turtle_img.src = turtle_url;
     }
-    draw_turtle(stroke_color);
+    draw_turtle(stroke_color, angle);
     
            
 
@@ -1097,28 +1102,28 @@ function setAmpersandWorker(): Promise<Worker> {
             ctx.lineTo(draw_location[0], draw_location[1]);
             ctx.stroke();
 
-            draw_turtle(stroke_color);
+            draw_turtle(stroke_color, angle);
 
             //show_canvas()
             timeoutHandler = setTimeout(function () {
               ampersand_worker.postMessage({
                 type: "continue",
               });
-            }, 100)
+            }, turtle_delay)
           } else if (sys_call.type === "turtle_turn_degrees") {
             /*fix_buttons(false, false);*/
 
             let radians = sys_call.degrees * (Math.PI / 180)
             angle = (angle + radians);
 
-            draw_turtle(stroke_color);
+            draw_turtle(stroke_color, angle);
 
             //show_canvas()
             timeoutHandler = setTimeout(function () {
               ampersand_worker.postMessage({
                 type: "continue",
               });
-            }, 100)
+            }, turtle_delay)
            }
            else if (sys_call.type === "turtle_turn") {
             /*fix_buttons(false, false);*/
@@ -1130,14 +1135,14 @@ function setAmpersandWorker(): Promise<Worker> {
               angle = (angle - Math.PI / 2)
             }
 
-            draw_turtle(stroke_color);
+            draw_turtle(stroke_color, angle);
 
             //show_canvas()
             timeoutHandler = setTimeout(function () {
               ampersand_worker.postMessage({
                 type: "continue",
               });
-            }, 100)
+            }, turtle_delay)
           } else if (sys_call.type === "turtle_color") {
             /*fix_buttons(false, false);*/
 
@@ -1153,12 +1158,14 @@ function setAmpersandWorker(): Promise<Worker> {
               }
             }
 
-            draw_turtle(stroke_color);
+            draw_turtle(stroke_color, angle);
 
             //show_canvas()
-            ampersand_worker.postMessage({
-              type: "continue",
-            });
+            timeoutHandler = setTimeout(function () {
+              ampersand_worker.postMessage({
+                type: "continue",
+              });
+            }, turtle_delay)
           }
         }
       }
