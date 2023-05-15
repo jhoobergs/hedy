@@ -431,31 +431,20 @@ function clearErrors(editor: AceAjax.Editor) {
 }
 
 export function stopit_ampersand() {
-  if (pygameRunning) {
-    // when running pygame, raise the pygame quit event
-    //Sk.insertPyGameEvent("quit");
-    //Sk.unbindPygameListeners();
+ 
+    ampersand_worker.terminate();
 
-    //pygameRunning = false;
-    document.onkeydown = null;
-    //$('#pygame-modal').hide();
-    $('#stopit').hide();
-    $('#runit').show();
-  }
-  else {
-    // We bucket-fix stop the current program by setting the run limit to 1ms
-    //Sk.execLimit = 1;
-    //clearTimeouts();
-    $('#stopit').hide();
-    $('#runit').show();
+  //clearTimeouts();
+  $('#stopit').hide();
+  $('#runit').show();
 
-    // This gets a bit complex: if we do have some input modal waiting, fake submit it and hide it
-    // This way the Promise is no longer "waiting" and can no longer mess with our next program
-    if ($('#ask-modal').is(":visible")) {
-      $('#ask-modal form').submit();
-      $('#ask-modal').hide();
-    }
+  // This gets a bit complex: if we do have some input modal waiting, fake submit it and hide it
+  // This way the Promise is no longer "waiting" and can no longer mess with our next program
+  if ($('#ask-modal').is(":visible")) {
+    $('#ask-modal form').submit();
+    $('#ask-modal').hide();
   }
+  
 
   askPromptOpen = false;
 }
@@ -489,6 +478,7 @@ export function stopit() {
 
   askPromptOpen = false;
 }
+
 
 function clearOutput() {
   const outputDiv = $('#output');
@@ -623,6 +613,17 @@ export async function runit_ampersand(level: number, lang: string, disabled_prom
     modal.notifyError(e.responseText);
   }
 }
+
+
+export function stopit_different(level: number) {
+  if (level < 2) {
+    return stopit_ampersand()
+  }
+  else {
+    return stopit()
+  }
+}
+
 
 export async function runit_different(level: number, lang: string, disabled_prompt: string, cb: () => void) {
   if (level < 2) {
@@ -1021,7 +1022,6 @@ function setAmpersandWorker(): Promise<Worker> {
     function draw_turtle(color: String, angle: number) {
       let turtle_img = new Image();
       let svg = turtle_svg(color, angle);
-      console.log(svg)
       let svg_blob = new Blob([svg], {type: 'image/svg+xml'});
       let turtle_url = DOMURL.createObjectURL(svg_blob);
 
@@ -1050,7 +1050,8 @@ function setAmpersandWorker(): Promise<Worker> {
         console.log(last_result);
         
         if (last_result.type === "done") {
-          //fix_buttons(true, false);
+          $('#stopit').hide();
+          $('#runit').show();
         } else if (last_result.type === "loaded") {
           //fix_buttons(true, false);
         } else if (last_result.type === "nothing_to_do") {
@@ -1177,6 +1178,7 @@ function setAmpersandWorker(): Promise<Worker> {
     };
   });
 }
+let ampersand_worker : Worker;
 
 export async function runAmpersandProgram(this: any, ast: String, hasTurtle: boolean, hasPygame: boolean, hasSleep: boolean, hasWarnings: boolean, cb: () => void) {
   let outputDiv = $('#output');
@@ -1185,7 +1187,7 @@ export async function runAmpersandProgram(this: any, ast: String, hasTurtle: boo
   $('#runit').hide();
   outputDiv.empty();
 
-  let ampersand_worker = await setAmpersandWorker();
+  ampersand_worker = await setAmpersandWorker();
 
   ampersand_worker.postMessage({
     type: "run_ast",
