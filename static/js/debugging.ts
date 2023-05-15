@@ -1,4 +1,4 @@
-import { runit } from "./app";
+import { runit, runit_ampersand, setAmpersandStep, stepAmpersand, stopit_ampersand, use_ampersand } from "./app";
 import { Markers } from "./markers";
 
 let theMarkers: Markers;
@@ -218,12 +218,54 @@ function updateBreakpointVisuals(editor: AceAjax.Editor) {
   theMarkers.strikethroughLines(disabledLines);
 }
 
+function debugRunDifferent() {
+  if (use_ampersand(theLevel)) {
+    debugRunAmpersand()
+  } else {
+    debugRun()
+  }
+}
+
+async function debugRunAmpersand() {
+  if (theLevel && theLanguage) {
+    setAmpersandStep(true);
+    await runit_ampersand(theLevel, theLanguage, "", function () {
+      $('#output').focus();
+    });
+  }
+}
+
 function debugRun() {
   if (theLevel && theLanguage) {
     runit(theLevel, theLanguage, "", function () {
       $('#output').focus();
     });
   }
+}
+
+export function startDebugDifferent(level: number) {
+  if (use_ampersand(level)) {
+    startDebugAmpersand()
+  } else {
+    startDebug()
+  }
+}
+
+export async function startDebugAmpersand() {
+  let debugButton = $("#debug_button");
+  debugButton.hide();
+  let continueButton = $("#debug_continue");
+  let stopButton = $("#debug_stop");
+  let resetButton = $("#debug_restart");
+  let runButtonContainer = $("#runButtonContainer");
+
+  runButtonContainer.hide();
+  continueButton.show();
+  stopButton.show();
+  resetButton.show();
+
+  await debugRunAmpersand();
+  incrementDebugLineAmpersand();
 }
 
 export function startDebug() {
@@ -244,6 +286,24 @@ export function startDebug() {
   }
 }
 
+
+export function resetDebugDifferent(level: number) {
+  if (use_ampersand(level)) {
+    resetDebugAmpersand()
+  } else {
+    resetDebug()
+  }
+}
+
+export function resetDebugAmpersand() {
+  var continueButton = $("#debug_continue");
+  continueButton.show();
+
+  //clearDebugVariables();
+  //markCurrentDebuggerLine();
+  debugRunAmpersand();  
+}
+
 export function resetDebug() {
   if (step_debugger === true) {
     var storage = window.localStorage;
@@ -255,6 +315,29 @@ export function resetDebug() {
     markCurrentDebuggerLine();
     debugRun();
   }
+}
+
+export function stopDebugDifferent(level: number) {
+  if (use_ampersand(level)) {
+    stopDebugAmpersand()
+  } else {
+    stopDebug()
+  }
+}
+
+export function stopDebugAmpersand() {
+  let debugButton = $("#debug_button");
+  debugButton.show();
+  let continueButton = $("#debug_continue");
+  let stopButton = $("#debug_stop");
+  let resetButton = $("#debug_restart");
+  let runButtonContainer = $("#runButtonContainer");
+
+  runButtonContainer.show();
+  continueButton.hide();
+  stopButton.hide();
+  resetButton.hide();
+  stopit_ampersand();
 }
 
 export function stopDebug() {
@@ -288,6 +371,18 @@ function clearDebugVariables() {
       storage.removeItem(key);
     }
   }
+}
+
+export function incrementDebugLineDifferent(level: number) {
+  if (use_ampersand(level)) {
+    incrementDebugLineAmpersand()
+  } else {
+    incrementDebugLine()
+  }
+}
+
+export function incrementDebugLineAmpersand() {
+  stepAmpersand()
 }
 
 export function incrementDebugLine() {

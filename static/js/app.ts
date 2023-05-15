@@ -614,9 +614,12 @@ export async function runit_ampersand(level: number, lang: string, disabled_prom
   }
 }
 
+export function use_ampersand(level: number) : boolean {
+  return level < 2
+}
 
 export function stopit_different(level: number) {
-  if (level < 2) {
+  if (use_ampersand(level)) {
     return stopit_ampersand()
   }
   else {
@@ -626,7 +629,8 @@ export function stopit_different(level: number) {
 
 
 export async function runit_different(level: number, lang: string, disabled_prompt: string, cb: () => void) {
-  if (level < 2) {
+  if (use_ampersand(level)) {
+    setAmpersandStep(false); // TODO: move this
     return runit_ampersand(level, lang, disabled_prompt, cb)
   }
   else {
@@ -1179,15 +1183,33 @@ function setAmpersandWorker(): Promise<Worker> {
   });
 }
 let ampersand_worker : Worker;
+let ampersand_step = false;
+
+export function setAmpersandStep(b: boolean) {
+  ampersand_step = b;
+}
+
+export function stepAmpersand() {
+  ampersand_worker.postMessage({
+    type: "continue",
+  });
+}
 
 export async function runAmpersandProgram(this: any, ast: String, hasTurtle: boolean, hasPygame: boolean, hasSleep: boolean, hasWarnings: boolean, cb: () => void) {
   let outputDiv = $('#output');
 
-  $('#stopit').show();
-  $('#runit').hide();
+  if (!ampersand_step) {
+    $('#stopit').show();
+    $('#runit').hide();
+  }
   outputDiv.empty();
 
   ampersand_worker = await setAmpersandWorker();
+
+  ampersand_worker.postMessage({
+    type: "set_step_by_step",
+    value: ampersand_step
+  });
 
   ampersand_worker.postMessage({
     type: "run_ast",

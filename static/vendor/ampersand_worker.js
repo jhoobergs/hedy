@@ -22,7 +22,7 @@ async function init_wasm_in_worker() {
     self.onmessage = async event => {
         console.log(event.data)
 
-        if (event.data.type === "toggle_step_by_step") {
+        if (event.data.type === "set_step_by_step") {
             if (event.data.value) {
                 run_type = "step"
             } else {
