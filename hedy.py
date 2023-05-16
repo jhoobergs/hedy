@@ -3288,7 +3288,7 @@ class ConvertToAmpersand_1(ConvertToAmpersand):
     def print(self, meta, args):
         return {
             "type": "print",
-            "content": args[0]
+            "content": [args[0], "\n"]
         }
 
     def ask(self, meta, args):
@@ -3300,7 +3300,7 @@ class ConvertToAmpersand_1(ConvertToAmpersand):
     def echo(self, meta, args):
          return {
             "type": "echo",
-            "content": args[0]["content"] if len(args) > 0 else ''
+            "content": [args[0]["content"] if len(args) > 0 else '', "\n"]
         }
 
     def comment(self, meta, args):
@@ -3393,10 +3393,10 @@ class ConvertToAmpersand_2(ConvertToAmpersand_1):
     def print(self, meta, args):
         return {
             "type": "print",
-            "content": {
+            "content": [{
                 "type": "string_with_var",
                 "content": ' '.join(map(lambda x: x["content"], args))
-            }
+            }, "\n"]
         }
     
     def ask(self, meta, args):
