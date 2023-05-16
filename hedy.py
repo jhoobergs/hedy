@@ -3401,7 +3401,7 @@ class ConvertToAmpersand_2(ConvertToAmpersand_1):
     
     def ask(self, meta, args):
         return {
-            "type": "assign",
+            "type": "assign_statement",
             "content": 
                 [
                     args[0],
@@ -3417,7 +3417,7 @@ class ConvertToAmpersand_2(ConvertToAmpersand_1):
 
     def assign(self, meta, args):
         return {
-            "type": "assign",
+            "type": "assign_statement",
             "content": 
                 [
                     args[0],
@@ -3434,6 +3434,88 @@ class ConvertToAmpersand_2(ConvertToAmpersand_1):
             }
         }
     
+@v_args(meta=True)
+@hedy_ampersand(level=3)
+class ConvertToAmpersand_3(ConvertToAmpersand_2):
+
+    def text(self, meta, args):
+        if len(args) == 1:
+            return {
+                "type": "string_or_var",
+                "content": args[0]
+            }
+        else:
+            return {
+                "type": "string_concat",
+                "content": [{
+                "type": "string_or_var",
+                "content": c
+            } for c in args]
+            }    
+
+    def print(self, meta, args):
+        return {
+            "type": "print",
+            "content": [
+                {
+                    "type": "string_concat",
+                    "content": args
+                }
+                , "\n"]
+        }
+    
+    def assign_list(self, meta, args):
+        content = [a["content"] for a in args[1:]]
+
+        return {
+            "type": "assign_statement",
+            "content": [
+                args[0],
+                {
+                "type": "list",
+                "content": content
+            }
+            ]
+        }
+
+    def list_access(self, meta, args):
+        print(args)
+     
+        if args[1] == 'random':
+            return {
+                "type": "list_random",
+                "content": args[0]
+                
+            }
+        else: # TODO: not yet supported, should it be?
+            return {
+                "type": "list_access",
+                "content": [
+                    args[0],
+                    args[1]
+                ]
+            }
+
+    def add(self, meta, args):
+        print(args)
+        return {
+            "type": "list_add_stmt",
+            "content": [
+                args[0],
+                args[1]["content"]
+            ]
+        }
+        
+        
+    def remove(self, meta, args):
+        return {
+            "type": "list_remove_stmt",
+            "content": [
+                args[0],
+                args[1]["content"]
+            ]
+        }
+
 def transpile_ampersand(input_string, level, lang="en"):
     transpile_result = transpile_ampersand_inner(input_string, level, lang)
     return transpile_result

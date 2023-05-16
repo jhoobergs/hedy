@@ -615,7 +615,7 @@ export async function runit_ampersand(level: number, lang: string, disabled_prom
 }
 
 export function use_ampersand(level: number) : boolean {
-  return level < 3
+  return level < 4
 }
 
 export function stopit_different(level: number) {

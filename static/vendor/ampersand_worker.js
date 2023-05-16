@@ -5,7 +5,7 @@ importScripts('/vendor/ampersand_wasm.js');
 
 //console.log('Initializing worker')
 
-const { L1StepExecutor, L2StepExecutor } = wasm_bindgen;
+const { L1StepExecutor, L2StepExecutor, L3StepExecutor } = wasm_bindgen;
 
 async function init_wasm_in_worker() {
     // Load the wasm file by awaiting the Promise returned by `wasm_bindgen`.
@@ -40,6 +40,8 @@ async function init_wasm_in_worker() {
                 executor = L1StepExecutor.from_json(event.data.ast);
             } else if (event.data.level === 2) {
                 executor = L2StepExecutor.from_json(event.data.ast);
+            }  else if (event.data.level === 3) {
+                executor = L3StepExecutor.from_json(event.data.ast);
             }
             console.log("parsed");
         } else if (event.data.type === "input") {
