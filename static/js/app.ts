@@ -615,7 +615,7 @@ export async function runit_ampersand(level: number, lang: string, disabled_prom
 }
 
 export function use_ampersand(level: number) : boolean {
-  return level < 2
+  return level < 3
 }
 
 export function stopit_different(level: number) {
@@ -1040,7 +1040,7 @@ function setAmpersandWorker(): Promise<Worker> {
     
            
 
-    let ampersand_worker = new Worker("vendor/ampersand_worker.js");
+    let ampersand_worker = new Worker("/vendor/ampersand_worker.js");
     ampersand_worker.onmessage = (e: { data: L1StepRes | L2StepRes | { type: "worker_is_ready" } }) => {
       //console.log("Message received from worker");
       let complete_last_result = e.data;
@@ -1213,7 +1213,8 @@ export async function runAmpersandProgram(this: any, ast: String, hasTurtle: boo
 
   ampersand_worker.postMessage({
     type: "run_ast",
-    ast
+    ast,
+    level: theLevel
   });
 
 }

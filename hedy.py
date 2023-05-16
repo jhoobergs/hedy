@@ -3319,7 +3319,7 @@ class ConvertToAmpersand_1(ConvertToAmpersand):
 
 
     def color(self, meta, args):
-         return {
+        return {
             "type": "color",
             "content": args[0].data if len(args) > 0 else "black"
         }
@@ -3329,7 +3329,111 @@ class ConvertToAmpersand_1(ConvertToAmpersand):
             "type": "turn",
             "content": args[0].data if len(args) > 0 else "right"
         }
+    
 
+@v_args(meta=True)
+@hedy_ampersand(level=2)
+class ConvertToAmpersand_2(ConvertToAmpersand_1):
+
+    def error_ask_dep_2(self, meta, args):
+        # ask is no longer usable this way, raise!
+        # ask_needs_var is an entry in lang.yaml in texts where we can add extra info on this error
+        raise hedy.exceptions.WrongLevelException(1, 'ask', "ask_needs_var", meta.line)
+
+    def error_echo_dep_2(self, meta, args):
+        # echo is no longer usable this way, raise!
+        # ask_needs_var is an entry in lang.yaml in texts where we can add extra info on this error
+        raise hedy.exceptions.WrongLevelException(1, 'echo', "echo_out", meta.line)
+
+    def text(self, meta, args):
+        return {
+            "type": "string_with_var",
+            "content": ''.join([str(c) for c in args])
+        }
+    
+    def number(self, meta, args):
+        return self.text(meta, args)
+
+    def NEGATIVE_NUMBER(self, meta, args):
+        return self.text(meta, args)
+
+    def color(self, meta, args):
+        return {
+            "type": "color",
+            "content": args[0] if len(args) > 0 else { "type": "string", "content": "black" }
+        }
+
+    def turn(self, meta, args):
+        return {
+            "type": "turn",
+            "content": args[0] if len(args) > 0 else { "type": "string", "content": "90" }
+        }
+
+    def forward(self, meta, args):
+        return {
+            "type": "forward",
+            "content": args[0] if len(args) > 0 else { # TODO: default to ampersand?
+                "type": "string",
+                "content": "50"
+            }
+        }
+
+    def var(self, meta, args):
+        return args[0]
+
+    def var_access(self, meta, args):
+        return {
+            "type": "var",
+            "content": args[0]
+        }
+
+    def var_access_print(self, meta, args):
+        return self.var_access(meta, args)
+
+    def print(self, meta, args):
+        return {
+            "type": "print",
+            "content": {
+                "type": "string_with_var",
+                "content": ' '.join(map(lambda x: x["content"], args))
+            }
+        }
+    
+    def ask(self, meta, args):
+        return {
+            "type": "assign",
+            "content": 
+                [
+                    args[0],
+                    {
+                        "type": "input",
+                        "content":  {
+                            "type": "string",
+                            "content": " ".join(map(lambda x: x["content"], args[1:]))
+                        }
+                    }
+                ]
+        }
+
+    def assign(self, meta, args):
+        return {
+            "type": "assign",
+            "content": 
+                [
+                    args[0],
+                    args[1]
+                ]
+        }
+
+    def sleep(self, meta, args):
+        return {
+            "type": "sleep",
+            "content": args[0] if len(args) > 0 else {
+                "type": "string",
+                "content": "1"
+            }
+        }
+    
 def transpile_ampersand(input_string, level, lang="en"):
     transpile_result = transpile_ampersand_inner(input_string, level, lang)
     return transpile_result

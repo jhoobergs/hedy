@@ -5,7 +5,7 @@ importScripts('/vendor/ampersand_wasm.js');
 
 //console.log('Initializing worker')
 
-const { L1StepExecutor } = wasm_bindgen;
+const { L1StepExecutor, L2StepExecutor } = wasm_bindgen;
 
 async function init_wasm_in_worker() {
     // Load the wasm file by awaiting the Promise returned by `wasm_bindgen`.
@@ -36,7 +36,11 @@ async function init_wasm_in_worker() {
         } else if (event.data.type === "run_ast") {
             console.log("Loading");
             console.log(event.data.ast);
-            executor = L1StepExecutor.from_json(event.data.ast);
+            if (event.data.level === 1) { // TODO: add a HedyStepExecutor in ampersand-wasm that does the level checking internal?
+                executor = L1StepExecutor.from_json(event.data.ast);
+            } else if (event.data.level === 2) {
+                executor = L2StepExecutor.from_json(event.data.ast);
+            }
             console.log("parsed");
         } else if (event.data.type === "input") {
             executor.add_input(event.data.input);
