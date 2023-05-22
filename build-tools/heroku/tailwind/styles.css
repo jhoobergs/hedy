@@ -527,6 +527,15 @@ p.close-dialog {
     z-index: 20
 }
 
+/**
+ * Will be used to indicate previous line in debugger
+ */
+ .debugger-previous-line {
+  @apply absolute;
+  background: pink;
+  z-index: 20
+}
+
 /* DOCS */
 
 .expandable-docs-text h1 {

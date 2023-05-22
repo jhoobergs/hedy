@@ -1,3 +1,5 @@
+import { Span } from "./ampersand";
+
 /**
  * A manager for markers in Ace
  *
@@ -11,6 +13,9 @@ export class Markers {
   private strikeMarkers = new Map<number, number>();
 
   private currentLineMarker?: MarkerLocation;
+
+  private currentNextExpressionMarker?: SpanMarkerLocation;
+  private currentPreviousExpressionMarker?: SpanMarkerLocation;
 
   constructor(private readonly editor: AceAjax.Editor) {
   }
@@ -79,6 +84,51 @@ export class Markers {
   }
 
   /**
+   * Set the next expression in the debugger
+   */
+  public setDebuggerNextExpression(span: Span | undefined) {
+    console.log("next", span);
+
+    if (this.currentNextExpressionMarker?.span === span) {
+      return;
+    }
+
+    if (this.currentNextExpressionMarker) {
+      this.removeMarker(this.currentNextExpressionMarker.id);
+    }
+
+    if (span === undefined) {
+      this.currentNextExpressionMarker = undefined;
+      return;
+    }
+
+    const id = this.addMarker(new ace.Range(span.start[0]-1, span.start[1]-1, span.end[0]-1, span.end[1]-1), 'debugger-current-line', 'text');
+    this.currentNextExpressionMarker = { span, id };
+  }
+
+  /**
+   * Set the previous expression in the debugger
+   */
+  public setDebuggerPreviousExpression(span: Span | undefined) {
+    console.log("previous", span);
+    if (this.currentPreviousExpressionMarker?.span === span) {
+      return;
+    }
+
+    if (this.currentPreviousExpressionMarker) {
+      this.removeMarker(this.currentPreviousExpressionMarker.id);
+    }
+
+    if (span === undefined) {
+      this.currentPreviousExpressionMarker = undefined;
+      return;
+    }
+
+    const id = this.addMarker(new ace.Range(span.start[0]-1, span.start[1]-1, span.end[0]-1, span.end[1]-1), 'debugger-previous-line', 'text');
+    this.currentPreviousExpressionMarker = { span, id };
+  }
+
+  /**
    * Mark the given set of lines as currently struck through
    */
   public strikethroughLines(lines: number[]) {
@@ -124,5 +174,11 @@ export class Markers {
 
 interface MarkerLocation {
   readonly line: number;
+  readonly id: number;
+}
+
+
+interface SpanMarkerLocation {
+  readonly span: Span;
   readonly id: number;
 }

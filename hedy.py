@@ -3248,6 +3248,14 @@ class ConvertToAmpersand(Transformer):
         return '\n'.join([' ' * spaces_amount + line for line in lines])
 
 
+    @staticmethod
+    def span(meta):
+        return {
+            "start": [meta.line, meta.column],
+            "end": [meta.end_line, meta.end_column]
+        }
+
+
 @v_args(meta=True)
 @hedy_ampersand(level=1)
 class ConvertToAmpersand_1(ConvertToAmpersand):
@@ -3260,7 +3268,7 @@ class ConvertToAmpersand_1(ConvertToAmpersand):
     def program(self, meta, args):
         return {
             "type": "comp",
-            "content": args
+            "content": [self.span(meta), args]
         }
 
     def command(self, meta, args):
@@ -3269,7 +3277,7 @@ class ConvertToAmpersand_1(ConvertToAmpersand):
     def text(self, meta, args):
         return {
             "type": "string",
-            "content": ''.join([str(c) for c in args])
+            "content": [self.span(meta), ''.join([str(c) for c in args])]
         }
 
     def integer(self, meta, args):
@@ -3288,19 +3296,19 @@ class ConvertToAmpersand_1(ConvertToAmpersand):
     def print(self, meta, args):
         return {
             "type": "print",
-            "content": [args[0], "\n"]
+            "content": [self.span(meta), args[0], "\n"]
         }
 
     def ask(self, meta, args):
-         return {
+        return {
             "type": "ask",
-            "content": args[0]["content"] # put string directly
+            "content": [self.span(meta), args[0]["content"][1]] # put string directly
         }
 
     def echo(self, meta, args):
-         return {
+        return {
             "type": "echo",
-            "content": [args[0]["content"] if len(args) > 0 else '', "\n"]
+            "content": [self.span(meta), args[0]["content"][1] if len(args) > 0 else '', "\n"]
         }
 
     def comment(self, meta, args):
@@ -3314,20 +3322,20 @@ class ConvertToAmpersand_1(ConvertToAmpersand):
     def forward(self, meta, args):
         return {
             "type": "forward",
-            "content": int(args[0]) if len(args) > 0 else 50
+            "content": [self.span(meta), int(args[0]) if len(args) > 0 else 50]
         }
 
 
     def color(self, meta, args):
         return {
             "type": "color",
-            "content": args[0].data if len(args) > 0 else "black"
+            "content": [self.span(meta), args[0].data if len(args) > 0 else "black"]
         }
 
     def turn(self, meta, args):
          return {
             "type": "turn",
-            "content": args[0].data if len(args) > 0 else "right"
+            "content": [self.span(meta), args[0].data if len(args) > 0 else "right"]
         }
     
 

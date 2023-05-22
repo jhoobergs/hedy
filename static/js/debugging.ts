@@ -265,7 +265,7 @@ export async function startDebugAmpersand() {
   resetButton.show();
 
   await debugRunAmpersand();
-  incrementDebugLineAmpersand();
+  //incrementDebugLineAmpersand();
 }
 
 export function startDebug() {

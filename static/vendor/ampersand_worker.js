@@ -5,7 +5,7 @@ importScripts('/vendor/ampersand_wasm.js');
 
 //console.log('Initializing worker')
 
-const { L1StepExecutor, L2StepExecutor, L3StepExecutor } = wasm_bindgen;
+const { HedyL1SpannedStepExecutor, L1StepExecutor, L2StepExecutor, L3StepExecutor } = wasm_bindgen;
 
 async function init_wasm_in_worker() {
     // Load the wasm file by awaiting the Promise returned by `wasm_bindgen`.
@@ -37,13 +37,16 @@ async function init_wasm_in_worker() {
             console.log("Loading");
             console.log(event.data.ast);
             if (event.data.level === 1) { // TODO: add a HedyStepExecutor in ampersand-wasm that does the level checking internal?
-                executor = L1StepExecutor.from_json(event.data.ast);
+                executor = HedyL1SpannedStepExecutor.from_json(event.data.ast);
             } else if (event.data.level === 2) {
                 executor = L2StepExecutor.from_json(event.data.ast);
             }  else if (event.data.level === 3) {
                 executor = L3StepExecutor.from_json(event.data.ast);
             }
             console.log("parsed");
+            self.postMessage({ type: "loaded", next_span: executor.next_span });
+
+            return
         } else if (event.data.type === "input") {
             executor.add_input(event.data.input);
         }
@@ -54,7 +57,8 @@ async function init_wasm_in_worker() {
             executor = executor.next_syscall();
         }
         let stepped_last_result = executor.last_result;
-        self.postMessage(stepped_last_result);
+        let next_span = executor.next_span;
+        self.postMessage({ type: "result", result: stepped_last_result, next_span });
     }
 };
 

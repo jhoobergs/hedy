@@ -14,7 +14,7 @@ import { initializeDebugger, load_variables, returnLinesWithoutBreakpoints, stop
 import { localDelete, localLoad, localSave } from './local';
 import { initializeLoginLinks } from './auth';
 import { postJson } from './comm';
-import { L1StepRes, L2StepRes } from './ampersand';
+import { HedyL1SpannedStepRes, L1StepRes, L2StepRes, Span } from './ampersand';
 
 // const MOVE_CURSOR_TO_BEGIN = -1;
 const MOVE_CURSOR_TO_END = 1;
@@ -994,6 +994,7 @@ window.onerror = function reportClientException(message, source, line_number, co
 function setAmpersandWorker(): Promise<Worker> {
   return new Promise(function (ok) {
     let timeoutHandler = undefined;
+    let theMarkers : Markers= new Markers(theGlobalEditor);
     let prompt : String | undefined = undefined;
     let canvas = document.getElementById("drawcanvas") as HTMLCanvasElement;
     let ctx = canvas.getContext("2d")!;
@@ -1041,145 +1042,170 @@ function setAmpersandWorker(): Promise<Worker> {
            
 
     let ampersand_worker = new Worker("/vendor/ampersand_worker.js");
-    ampersand_worker.onmessage = (e: { data: L1StepRes | L2StepRes | { type: "worker_is_ready" } }) => {
+    ampersand_worker.onmessage = (e: { data: { type: "worker_is_ready" } | { type: "result", result: HedyL1SpannedStepRes, next_span: Span | undefined } | { type: "loaded", next_span: Span }}) => {
       //console.log("Message received from worker");
-      let complete_last_result = e.data;
-      console.log(complete_last_result);
-
-      if (complete_last_result.type === "worker_is_ready") {
+      console.log(e.data);
+      if (e.data.type === "worker_is_ready") {        
         ok(ampersand_worker)
-      }
-      else if (complete_last_result.type === "normal") {
-        let last_result = complete_last_result.data;
-        console.log(last_result);
-        
-        if (last_result.type === "done") {
-          $('#stopit').hide();
-          $('#runit').show();
-        } else if (last_result.type === "loaded") {
-          //fix_buttons(true, false);
-        } else if (last_result.type === "nothing_to_do") {
-          //fix_buttons(true, false);
-        } else if (last_result.type === "runtime_error") {
-          //has_error = true;
-          //fix_buttons(true, false);
-          //runtime_error_field.innerHTML = JSON.stringify(last_result.error);
-        }
-        else if (last_result.type === "sys_call") {
-          let sys_call = last_result.sys_call;
-          if (sys_call.type === "writing_output") {
-            outf(sys_call.text);
-            ampersand_worker.postMessage({
-              type: "continue",
-            });
-          } else if (sys_call.type === "writing_input_question") {
-            /*fix_buttons(false, false);
-            input_text.innerText = sys_call.question || "";
-            */
-            prompt = sys_call.question;
-            ampersand_worker.postMessage({
-              type: "continue",
-            });
-          } else if (sys_call.type === "waiting_for_input") {
-            inputFromInlineModal(prompt as string).then(x => {
-              ampersand_worker.postMessage({
-                type: "input",
-                input: x
-              });
-            })
+      } else if (e.data.type === "loaded") {        
+        theMarkers.setDebuggerNextExpression(e.data.next_span);
+      } else {
+        let complete_last_result = e.data.result;
+
+        if (complete_last_result.type === "normal") {
+          let last_result = complete_last_result.data;
+  
+          console.log(last_result);
+          
+          if (last_result.type === "done") {
+            $('#stopit').hide();
+            $('#runit').show();
+            theMarkers.setDebuggerPreviousExpression(undefined);
+          } else if (last_result.type === "loaded") {
+            //fix_buttons(true, false);
+            theMarkers.setDebuggerPreviousExpression(undefined);
+          } else if (last_result.type === "nothing_to_do") {
+            //fix_buttons(true, false);
+            theMarkers.setDebuggerPreviousExpression(undefined);
+          } else if (last_result.type === "runtime_error") {
+            //has_error = true;
+            //fix_buttons(true, false);
+            //runtime_error_field.innerHTML = JSON.stringify(last_result.error);
+            theMarkers.setDebuggerPreviousExpression(last_result.error.span);
           }
-          else if (sys_call.type === "sleep") {
-            /*fix_buttons(false, false);*/
-            timeoutHandler = setTimeout(function () {
-              ampersand_worker.postMessage({
-                type: "continue",
-              });
-            }, sys_call.seconds * 1000)
-          } else if (sys_call.type === "turtle_forward") {
-            /*fix_buttons(false, false);*/
-
-            let forward = sys_call.amount;
-            ctx.beginPath();
-            ctx.moveTo(draw_location[0], draw_location[1]);
-            draw_location = [draw_location[0] + forward * Math.cos(angle), draw_location[1] + forward * Math.sin(angle)]
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = stroke_color;
-            ctx.lineTo(draw_location[0], draw_location[1]);
-            ctx.stroke();
-
-            draw_turtle(stroke_color, angle);
-
-            //show_canvas()
-            timeoutHandler = setTimeout(function () {
-              ampersand_worker.postMessage({
-                type: "continue",
-              });
-            }, turtle_delay)
-          } else if (sys_call.type === "turtle_turn_degrees") {
-            /*fix_buttons(false, false);*/
-
-            let radians = sys_call.degrees * (Math.PI / 180)
-            angle = (angle + radians);
-
-            draw_turtle(stroke_color, angle);
-
-            //show_canvas()
-            timeoutHandler = setTimeout(function () {
-              ampersand_worker.postMessage({
-                type: "continue",
-              });
-            }, turtle_delay)
-           }
-           else if (sys_call.type === "turtle_turn") {
-            /*fix_buttons(false, false);*/
-
-            let turn = sys_call.direction;
-            if (turn == "right") {
-              angle = (angle + Math.PI / 2)
-            } else if (turn == "left") {
-              angle = (angle - Math.PI / 2)
-            }
-
-            draw_turtle(stroke_color, angle);
-
-            //show_canvas()
-            timeoutHandler = setTimeout(function () {
-              ampersand_worker.postMessage({
-                type: "continue",
-              });
-            }, turtle_delay)
-          } else if (sys_call.type === "turtle_color") {
-            /*fix_buttons(false, false);*/
-
-            let color = sys_call.color;
-            if (color) {
-              // TODO: better
-              if (color == "blue") {
-                stroke_color = "#0000FF";
-              } else if (color == "black") {
-                stroke_color = "#000000";
-              } else if (color == "red") {
-                stroke_color = "#FF0000";
+          else if (last_result.type === "sys_call") {
+            let sys_call = last_result.sys_call.data;
+            let sys_call_span = last_result.sys_call.span;
+  
+            if (sys_call.type === "writing_output") {
+              outf(sys_call.text);
+              if (!ampersand_step) {
+                ampersand_worker.postMessage({
+                  type: "continue",
+                });
               }
+            } else if (sys_call.type === "writing_input_question") {
+              /*fix_buttons(false, false);
+              input_text.innerText = sys_call.question || "";
+              */
+              prompt = sys_call.question;
+              if (!ampersand_step) {
+                ampersand_worker.postMessage({
+                  type: "continue",
+                });
+              }
+            } else if (sys_call.type === "waiting_for_input") {
+              inputFromInlineModal(prompt as string).then(x => {
+                ampersand_worker.postMessage({
+                  type: "input",
+                  input: x
+                });
+              })
             }
-
-            draw_turtle(stroke_color, angle);
-
-            //show_canvas()
-            timeoutHandler = setTimeout(function () {
-              ampersand_worker.postMessage({
-                type: "continue",
-              });
-            }, turtle_delay)
+            // else if (sys_call.type === "sleep") {
+            //   /*fix_buttons(false, false);*/
+            //   timeoutHandler = setTimeout(function () {
+            //     ampersand_worker.postMessage({
+            //       type: "continue",
+            //     });
+            //   }, sys_call.seconds * 1000)
+            // } 
+            else if (sys_call.type === "turtle_forward") {
+              /*fix_buttons(false, false);*/
+  
+              let forward = sys_call.amount;
+              ctx.beginPath();
+              ctx.moveTo(draw_location[0], draw_location[1]);
+              draw_location = [draw_location[0] + forward * Math.cos(angle), draw_location[1] + forward * Math.sin(angle)]
+              ctx.lineWidth = 2;
+              ctx.strokeStyle = stroke_color;
+              ctx.lineTo(draw_location[0], draw_location[1]);
+              ctx.stroke();
+  
+              draw_turtle(stroke_color, angle);
+  
+              //show_canvas()
+              if (!ampersand_step) {
+                timeoutHandler = setTimeout(function () {
+                  ampersand_worker.postMessage({
+                    type: "continue",
+                  });
+                }, turtle_delay)
+              }
+            } 
+            // else if (sys_call.type === "turtle_turn_degrees") {
+            //   /*fix_buttons(false, false);*/
+  
+            //   let radians = sys_call.degrees * (Math.PI / 180)
+            //   angle = (angle + radians);
+  
+            //   draw_turtle(stroke_color, angle);
+  
+            //   //show_canvas()
+            //   timeoutHandler = setTimeout(function () {
+            //     ampersand_worker.postMessage({
+            //       type: "continue",
+            //     });
+            //   }, turtle_delay)
+            //  }
+             else if (sys_call.type === "turtle_turn") {
+              /*fix_buttons(false, false);*/
+  
+              let turn = sys_call.direction;
+              if (turn == "right") {
+                angle = (angle + Math.PI / 2)
+              } else if (turn == "left") {
+                angle = (angle - Math.PI / 2)
+              }
+  
+              draw_turtle(stroke_color, angle);
+  
+              //show_canvas()
+              if (!ampersand_step) {
+                timeoutHandler = setTimeout(function () {
+                  ampersand_worker.postMessage({
+                    type: "continue",
+                  });
+                }, turtle_delay)
+              }
+            } else if (sys_call.type === "turtle_color") {
+              /*fix_buttons(false, false);*/
+  
+              let color = sys_call.color;
+              if (color) {
+                // TODO: better
+                if (color == "blue") {
+                  stroke_color = "#0000FF";
+                } else if (color == "black") {
+                  stroke_color = "#000000";
+                } else if (color == "red") {
+                  stroke_color = "#FF0000";
+                }
+              }
+  
+              draw_turtle(stroke_color, angle);
+  
+              //show_canvas()
+              if (!ampersand_step) {
+                timeoutHandler = setTimeout(function () {
+                  ampersand_worker.postMessage({
+                    type: "continue",
+                  });
+                }, turtle_delay)
+            }
+            }
+            theMarkers.setDebuggerPreviousExpression(sys_call_span);
           }
         }
+        else if (complete_last_result.type === "step") {
+          //fix_buttons(false, true);
+          //step_by_step_output_area.value += JSON.stringify(complete_last_result.data) + "\n";
+          theMarkers.setDebuggerPreviousExpression(complete_last_result.data.span);
+        }
+        theMarkers.setDebuggerNextExpression(e.data.next_span);
       }
-      else if (complete_last_result.type === "step") {
-        //fix_buttons(false, true);
-        //step_by_step_output_area.value += JSON.stringify(complete_last_result.data) + "\n";
-      }
+    };         
 
-    };
   });
 }
 let ampersand_worker : Worker;
@@ -1216,6 +1242,12 @@ export async function runAmpersandProgram(this: any, ast: String, hasTurtle: boo
     ast,
     level: theLevel
   });
+
+  if (!ampersand_step) {
+    ampersand_worker.postMessage({
+      type: "continue",
+    });
+  }
 
 }
 
