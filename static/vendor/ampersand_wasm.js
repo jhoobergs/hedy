@@ -346,6 +346,78 @@ class HedyL1SpannedStepExecutor {
 __exports.HedyL1SpannedStepExecutor = HedyL1SpannedStepExecutor;
 /**
 */
+class HedyL2SpannedStepExecutor {
+
+    static __wrap(ptr) {
+        const obj = Object.create(HedyL2SpannedStepExecutor.prototype);
+        obj.ptr = ptr;
+
+        return obj;
+    }
+
+    __destroy_into_raw() {
+        const ptr = this.ptr;
+        this.ptr = 0;
+
+        return ptr;
+    }
+
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_hedyl2spannedstepexecutor_free(ptr);
+    }
+    /**
+    * @param {string} json
+    * @returns {HedyL2SpannedStepExecutor}
+    */
+    static from_json(json) {
+        const ptr0 = passStringToWasm0(json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.hedyl2spannedstepexecutor_from_json(ptr0, len0);
+        return HedyL2SpannedStepExecutor.__wrap(ret);
+    }
+    /**
+    * @param {string} s
+    */
+    add_input(s) {
+        const ptr0 = passStringToWasm0(s, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.hedyl2spannedstepexecutor_add_input(this.ptr, ptr0, len0);
+    }
+    /**
+    * @returns {HedyL2SpannedStepExecutor}
+    */
+    next() {
+        const ptr = this.__destroy_into_raw();
+        const ret = wasm.hedyl2spannedstepexecutor_next(ptr);
+        return HedyL2SpannedStepExecutor.__wrap(ret);
+    }
+    /**
+    * @returns {HedyL2SpannedStepExecutor}
+    */
+    next_syscall() {
+        const ptr = this.__destroy_into_raw();
+        const ret = wasm.hedyl2spannedstepexecutor_next_syscall(ptr);
+        return HedyL2SpannedStepExecutor.__wrap(ret);
+    }
+    /**
+    * @returns {any}
+    */
+    get last_result() {
+        const ret = wasm.hedyl2spannedstepexecutor_last_result(this.ptr);
+        return takeObject(ret);
+    }
+    /**
+    * @returns {any}
+    */
+    get next_span() {
+        const ret = wasm.hedyl2spannedstepexecutor_next_span(this.ptr);
+        return takeObject(ret);
+    }
+}
+__exports.HedyL2SpannedStepExecutor = HedyL2SpannedStepExecutor;
+/**
+*/
 class L1StepExecutor {
 
     static __wrap(ptr) {

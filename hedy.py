@@ -6,6 +6,7 @@ from lark import Lark
 from lark.exceptions import UnexpectedEOF, UnexpectedCharacters, VisitError
 from lark import Tree, Transformer, visitors, v_args
 from os import path
+import inspect
 
 import warnings
 import hedy
@@ -463,14 +464,14 @@ class ExtractAST(Transformer):
     def INT(self, args):
         return Tree('integer', [str(args)])
 
-    def NUMBER(self, args):
-        return Tree('number', [str(args)])
+    def number(self, meta, args):
+        return Tree('number', [' '.join([str(c.children[0]) for c in args])], meta)
 
     def POSITIVE_NUMBER(self, args):
-        return Tree('number', [str(args)])
+        return Tree('POSITIVE_NUMBER', [str(args)])
 
     def NEGATIVE_NUMBER(self, args):
-        return Tree('number', [str(args)])
+        return Tree('NEGATIVE_NUMBER', [str(args)])
 
     # level 2
     def var(self, meta, args):
@@ -960,7 +961,11 @@ class Filter(Transformer):
         return True, 'random', meta
 
     def number(self, meta, args):
-        return True, ''.join([c for c in args]), meta
+        bool_arguments = [x[0] for x in args]
+        return all(bool_arguments), ''.join([c[1] for c in args]), meta
+
+    def POSITIVE_NUMBER(self, args):
+        return True, ''.join([c for c in args]), None
 
     def NEGATIVE_NUMBER(self, args):
         return True, ''.join([c for c in args]), None
@@ -3290,9 +3295,6 @@ class ConvertToAmpersand_1(ConvertToAmpersand):
     def number(self, meta, args):
         return int(args[0])
 
-    def NEGATIVE_NUMBER(self, meta, args):
-        return int(args[0])
-
     def print(self, meta, args):
         return {
             "type": "print",
@@ -3356,34 +3358,32 @@ class ConvertToAmpersand_2(ConvertToAmpersand_1):
     def text(self, meta, args):
         return {
             "type": "string_with_var",
-            "content": ''.join([str(c) for c in args])
+            "content": [self.span(meta), ''.join([str(c) for c in args])]
         }
     
     def number(self, meta, args):
         return self.text(meta, args)
 
-    def NEGATIVE_NUMBER(self, meta, args):
-        return self.text(meta, args)
-
     def color(self, meta, args):
         return {
             "type": "color",
-            "content": args[0] if len(args) > 0 else { "type": "string", "content": "black" }
+            "content": [self.span(meta), args[0] if len(args) > 0 else { "type": "string", "content": "black" }]
         }
 
     def turn(self, meta, args):
         return {
             "type": "turn",
-            "content": args[0] if len(args) > 0 else { "type": "string", "content": "90" }
+            "content": [self.span(meta), args[0] if len(args) > 0 else { "type": "string", "content": "90" }]
         }
 
     def forward(self, meta, args):
+        print("forward", inspect.getmembers(meta))
         return {
             "type": "forward",
-            "content": args[0] if len(args) > 0 else { # TODO: default to ampersand?
+            "content": [self.span(meta), args[0] if len(args) > 0 else { # TODO: default to ampersand?
                 "type": "string",
                 "content": "50"
-            }
+            }]
         }
 
     def var(self, meta, args):
@@ -3392,7 +3392,7 @@ class ConvertToAmpersand_2(ConvertToAmpersand_1):
     def var_access(self, meta, args):
         return {
             "type": "var",
-            "content": args[0]
+            "content": [self.span(meta), args[0]]
         }
 
     def var_access_print(self, meta, args):
@@ -3401,24 +3401,26 @@ class ConvertToAmpersand_2(ConvertToAmpersand_1):
     def print(self, meta, args):
         return {
             "type": "print",
-            "content": [{
+            "content": [self.span(meta), {
                 "type": "string_with_var",
-                "content": ' '.join(map(lambda x: x["content"], args))
+                "content": [args[0]["content"][0], ' '.join(map(lambda x: x["content"][1], args))] # TODO: span
             }, "\n"]
         }
     
     def ask(self, meta, args):
+        print(args)
         return {
             "type": "assign_statement",
             "content": 
-                [
+                [ 
+                    self.span(meta),
                     args[0],
                     {
                         "type": "input",
-                        "content":  {
+                        "content":  [args[1]["content"][0] , {
                             "type": "string",
-                            "content": " ".join(map(lambda x: x["content"], args[1:]))
-                        }
+                            "content": [args[1]["content"][0], " ".join(map(lambda x: x["content"][1], args[1:]))] # TODO span
+                        }]
                     }
                 ]
         }
@@ -3428,6 +3430,7 @@ class ConvertToAmpersand_2(ConvertToAmpersand_1):
             "type": "assign_statement",
             "content": 
                 [
+                    self.span(meta),
                     args[0],
                     args[1]
                 ]
@@ -3436,10 +3439,10 @@ class ConvertToAmpersand_2(ConvertToAmpersand_1):
     def sleep(self, meta, args):
         return {
             "type": "sleep",
-            "content": args[0] if len(args) > 0 else {
+            "content": [self.span(meta), args[0] if len(args) > 0 else {
                 "type": "string",
                 "content": "1"
-            }
+            }]
         }
     
 @v_args(meta=True)

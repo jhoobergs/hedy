@@ -5,7 +5,7 @@ importScripts('/vendor/ampersand_wasm.js');
 
 //console.log('Initializing worker')
 
-const { HedyL1SpannedStepExecutor, L1StepExecutor, L2StepExecutor, L3StepExecutor } = wasm_bindgen;
+const { HedyL1SpannedStepExecutor, L1StepExecutor, HedyL2SpannedStepExecutor, L3StepExecutor } = wasm_bindgen;
 
 async function init_wasm_in_worker() {
     // Load the wasm file by awaiting the Promise returned by `wasm_bindgen`.
@@ -39,7 +39,7 @@ async function init_wasm_in_worker() {
             if (event.data.level === 1) { // TODO: add a HedyStepExecutor in ampersand-wasm that does the level checking internal?
                 executor = HedyL1SpannedStepExecutor.from_json(event.data.ast);
             } else if (event.data.level === 2) {
-                executor = L2StepExecutor.from_json(event.data.ast);
+                executor = HedyL2SpannedStepExecutor.from_json(event.data.ast);
             }  else if (event.data.level === 3) {
                 executor = L3StepExecutor.from_json(event.data.ast);
             }

@@ -14,7 +14,7 @@ import { initializeDebugger, load_variables, returnLinesWithoutBreakpoints, stop
 import { localDelete, localLoad, localSave } from './local';
 import { initializeLoginLinks } from './auth';
 import { postJson } from './comm';
-import { HedyL1SpannedStepRes, L1StepRes, L2StepRes, Span } from './ampersand';
+import { HedyL1SpannedStepRes, HedyL2SpannedStepRes, L1StepRes, L2StepRes, Span } from './ampersand';
 
 // const MOVE_CURSOR_TO_BEGIN = -1;
 const MOVE_CURSOR_TO_END = 1;
@@ -1042,7 +1042,7 @@ function setAmpersandWorker(): Promise<Worker> {
            
 
     let ampersand_worker = new Worker("/vendor/ampersand_worker.js");
-    ampersand_worker.onmessage = (e: { data: { type: "worker_is_ready" } | { type: "result", result: HedyL1SpannedStepRes, next_span: Span | undefined } | { type: "loaded", next_span: Span }}) => {
+    ampersand_worker.onmessage = (e: { data: { type: "worker_is_ready" } | { type: "result", result: HedyL1SpannedStepRes | HedyL2SpannedStepRes, next_span: Span | undefined } | { type: "loaded", next_span: Span }}) => {
       //console.log("Message received from worker");
       console.log(e.data);
       if (e.data.type === "worker_is_ready") {        
@@ -1102,14 +1102,16 @@ function setAmpersandWorker(): Promise<Worker> {
                 });
               })
             }
-            // else if (sys_call.type === "sleep") {
-            //   /*fix_buttons(false, false);*/
-            //   timeoutHandler = setTimeout(function () {
-            //     ampersand_worker.postMessage({
-            //       type: "continue",
-            //     });
-            //   }, sys_call.seconds * 1000)
-            // } 
+            else if (sys_call.type === "sleep") {
+              /*fix_buttons(false, false);*/
+              if (!ampersand_step) {
+                timeoutHandler = setTimeout(function () {
+                  ampersand_worker.postMessage({
+                    type: "continue",
+                  });
+                }, sys_call.seconds * 1000)
+              }
+            } 
             else if (sys_call.type === "turtle_forward") {
               /*fix_buttons(false, false);*/
   
@@ -1133,21 +1135,23 @@ function setAmpersandWorker(): Promise<Worker> {
                 }, turtle_delay)
               }
             } 
-            // else if (sys_call.type === "turtle_turn_degrees") {
-            //   /*fix_buttons(false, false);*/
+            else if (sys_call.type === "turtle_turn_degrees") {
+              /*fix_buttons(false, false);*/
   
-            //   let radians = sys_call.degrees * (Math.PI / 180)
-            //   angle = (angle + radians);
+              let radians = sys_call.degrees * (Math.PI / 180)
+              angle = (angle + radians);
   
-            //   draw_turtle(stroke_color, angle);
+              draw_turtle(stroke_color, angle);
   
-            //   //show_canvas()
-            //   timeoutHandler = setTimeout(function () {
-            //     ampersand_worker.postMessage({
-            //       type: "continue",
-            //     });
-            //   }, turtle_delay)
-            //  }
+              //show_canvas()
+              if (!ampersand_step) {
+                timeoutHandler = setTimeout(function () {
+                  ampersand_worker.postMessage({
+                    type: "continue",
+                  });
+                }, turtle_delay)
+              }
+             }
              else if (sys_call.type === "turtle_turn") {
               /*fix_buttons(false, false);*/
   
