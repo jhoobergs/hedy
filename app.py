@@ -654,7 +654,8 @@ def parse_ampersand():
 
             if transpile_result.has_turtle:
                 response['has_turtle'] = True
-        except Exception:
+        except Exception as e:
+            print(e)
             pass
 
         try:

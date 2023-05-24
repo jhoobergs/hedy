@@ -461,8 +461,8 @@ class ExtractAST(Transformer):
     def text(self, meta, args):
         return Tree('text', [' '.join([str(c) for c in args])], meta)
 
-    def INT(self, args):
-        return Tree('integer', [str(args)])
+    def int(self, meta, args):
+        return Tree('integer', [' '.join([str(c) for c in args])], meta)
 
     def number(self, meta, args):
         return Tree('number', [' '.join([str(c.children[0]) for c in args])], meta)
@@ -3289,7 +3289,7 @@ class ConvertToAmpersand_1(ConvertToAmpersand):
         # remove whitespaces
         return {
             "type": "string",
-            "content": str(int(args[0].replace(' ', '')))
+            "content":  str(int(args[0].replace(' ', '')))
         }
 
     def number(self, meta, args):
@@ -3363,26 +3363,28 @@ class ConvertToAmpersand_2(ConvertToAmpersand_1):
     
     def number(self, meta, args):
         return self.text(meta, args)
+    
+    def integer(self, meta, args):
+        return self.text(meta, args)
 
     def color(self, meta, args):
         return {
             "type": "color",
-            "content": [self.span(meta), args[0] if len(args) > 0 else { "type": "string", "content": "black" }]
+            "content": [self.span(meta), args[0] if len(args) > 0 else { "type": "string", "content": [self.span(meta), "black"] }] # TODO: optional expression and default value?, span is not really right
         }
 
     def turn(self, meta, args):
         return {
             "type": "turn",
-            "content": [self.span(meta), args[0] if len(args) > 0 else { "type": "string", "content": "90" }]
+            "content": [self.span(meta), args[0] if len(args) > 0 else { "type": "string", "content": [self.span(meta), "90"] }] # TODO: optional expression and default value?, span is not really right
         }
 
     def forward(self, meta, args):
-        print("forward", inspect.getmembers(meta))
         return {
             "type": "forward",
-            "content": [self.span(meta), args[0] if len(args) > 0 else { # TODO: default to ampersand?
+            "content": [self.span(meta), args[0] if len(args) > 0 else {
                 "type": "string",
-                "content": "50"
+                "content": [self.span(meta), "50"] # TODO: optional expression and default value?, span is not really right
             }]
         }
 
@@ -3408,7 +3410,6 @@ class ConvertToAmpersand_2(ConvertToAmpersand_1):
         }
     
     def ask(self, meta, args):
-        print(args)
         return {
             "type": "assign_statement",
             "content": 
@@ -3439,9 +3440,9 @@ class ConvertToAmpersand_2(ConvertToAmpersand_1):
     def sleep(self, meta, args):
         return {
             "type": "sleep",
-            "content": [self.span(meta), args[0] if len(args) > 0 else {
+            "content": [self.span(meta), args[0] if len(args) > 0 else { # TODO: optional expression and default value?, span is not really right -> place default in the executor?
                 "type": "string",
-                "content": "1"
+                "content": [self.span(meta), "1"]
             }]
         }
     
