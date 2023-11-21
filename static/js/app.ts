@@ -999,7 +999,7 @@ function setAmpersandWorker(): Promise<Worker> {
     let canvas = document.getElementById("drawcanvas") as HTMLCanvasElement;
     let ctx = canvas.getContext("2d")!;
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    let draw_location = [360, 150];
+    let draw_location : [number, number] = [360, 150];
     let stroke_color = "#000000";
     let angle = 3 * Math.PI / 2;
 
@@ -1010,6 +1010,32 @@ function setAmpersandWorker(): Promise<Worker> {
 
     let turtle_canvas = document.getElementById("drawcanvas_turtle") as HTMLCanvasElement;
     let turtle_ctx = turtle_canvas.getContext("2d")!;
+    let turtle_lines : Map<[[number, number], [number, number]], Span> = new Map();      
+
+    function getCursorPosition(canvas: HTMLCanvasElement, event: MouseEvent) : [number, number] {
+      const rect = canvas.getBoundingClientRect()
+      const x = event.clientX - rect.left
+      const y = event.clientY - rect.top
+      return [x, y]
+    }
+    function sqr(x: number) { return x * x }
+    function dist2(v:[number, number], w:[number, number]) { return sqr(v[0] - w[0]) + sqr(v[1] - w[1]) }
+    function distToSegmentSquared(p:[number, number], v:[number, number], w:[number, number]) {
+      var l2 = dist2(v, w);
+      if (l2 == 0) return dist2(p, v);
+      var t = ((p[0] - v[0]) * (w[0] - v[0]) + (p[1] - v[1]) * (w[1] - v[1])) / l2;
+      t = Math.max(0, Math.min(1, t));
+      return dist2(p, [ v[0] + t * (w[0] - v[0]),
+                        v[1] + t * (w[1] - v[1]) ]);
+    }
+    turtle_canvas.addEventListener('mousedown', function(e) {
+      let pos = getCursorPosition(canvas, e);
+      turtle_lines.forEach((span, line) => {
+        if (distToSegmentSquared(pos, line[0], line[1]) < 10) {
+          console.log("Hit", span);
+        }
+      });
+    });
 
     function turtle_svg(color: String, angle: number) : String {
       let degrees = (angle + Math.PI/2) / Math.PI * 180;
@@ -1039,7 +1065,6 @@ function setAmpersandWorker(): Promise<Worker> {
     }
     draw_turtle(stroke_color, angle);
     
-           
 
     let ampersand_worker = new Worker("/vendor/ampersand_worker.js");
     ampersand_worker.onmessage = (e: { data: { type: "worker_is_ready" } | { type: "result", result: HedyL1SpannedStepRes | HedyL2SpannedStepRes, next_span: Span | undefined } | { type: "loaded", next_span: Span }}) => {
@@ -1115,6 +1140,8 @@ function setAmpersandWorker(): Promise<Worker> {
             else if (sys_call.type === "turtle_forward") {
               /*fix_buttons(false, false);*/
   
+              let start = draw_location;
+
               let forward = sys_call.amount;
               ctx.beginPath();
               ctx.moveTo(draw_location[0], draw_location[1]);
@@ -1123,9 +1150,11 @@ function setAmpersandWorker(): Promise<Worker> {
               ctx.strokeStyle = stroke_color;
               ctx.lineTo(draw_location[0], draw_location[1]);
               ctx.stroke();
-  
+                
               draw_turtle(stroke_color, angle);
-  
+
+              turtle_lines.set([start, draw_location], sys_call_span);
+
               //show_canvas()
               if (!ampersand_step) {
                 timeoutHandler = setTimeout(function () {
