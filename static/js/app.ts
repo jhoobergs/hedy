@@ -1033,6 +1033,8 @@ function setAmpersandWorker(): Promise<Worker> {
       turtle_lines.forEach((span, line) => {
         if (distToSegmentSquared(pos, line[0], line[1]) < 10) {
           console.log("Hit", span);
+          theMarkers.setDebuggerNextExpression(span);
+
         }
       });
     });
